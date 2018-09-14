@@ -28,8 +28,9 @@ namespace backward {
     int _traj_order, _min_order, _poly_num1D;
 
 // ros related
-    ros::Subscriber _dest_pts_sub;
+    ros::Subscriber _way_pts_sub;
     ros::Publisher  _wp_traj_vis_pub, _wp_path_vis_pub;
+    ros::Publisher  _vis_pos_pub, _vis_vel_pub, _vis_acc_pub;
 
 // **** global variable *** //
 // for planning
@@ -323,6 +324,7 @@ void pubCmd()
 
 void rcvWaypointsCallback(const nav_msgs::Path & wp)
 {    
+    cout<<": rcv waypoints"<<endl;
     vector<Vector3d> wp_list;
     wp_list.clear();
 
@@ -404,11 +406,14 @@ void trajGeneration(Eigen::MatrixXd path)
     _polyTime  = timeAllocation(path); 
     _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(path, vel, acc, _polyTime);   
     
+    cout<<"_polyCoeff: \n"<<_polyCoeff<<endl;
+
     visWayPointPath(path);
     visWayPointTraj( _polyCoeff, _polyTime);
 
     time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
-            
+    _time_allocator = time_optimizer.GetTimeAllcoation();
+
     _has_traj = true;    
     _traj_time_final = _traj_time_start = ros::Time::now();
 
@@ -438,7 +443,16 @@ int main(int argc, char** argv)
     nh.param("planning/min_order",  _min_order,  3 );
 
     nh.param("vis/vis_traj_width", _vis_traj_width,  0.15);
-        
+    
+    _way_pts_sub     = nh.subscribe( "waypoints",  1, rcvWaypointsCallback );
+
+    _wp_traj_vis_pub = nh.advertise<visualization_msgs::Marker>("spatial_trajectory", 1);
+    _wp_path_vis_pub = nh.advertise<visualization_msgs::Marker>("waypoint_path"     , 1);
+
+    _vis_pos_pub     = nh.advertise<visualization_msgs::Marker>("desired_position", 50);    
+    _vis_vel_pub     = nh.advertise<visualization_msgs::Marker>("desired_velocity", 50);    
+    _vis_acc_pub     = nh.advertise<visualization_msgs::Marker>("desired_acceleration", 50);
+
     _poly_num1D = _traj_order + 1;
 
     _vis_pos.ns = "pos";
