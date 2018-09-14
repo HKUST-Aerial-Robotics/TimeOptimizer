@@ -1,25 +1,15 @@
 #include <string>
 #include <iostream>
-#include <fstream>
 #include <math.h>
 #include <eigen3/Eigen/Dense>
-
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-
 #include <random>
 #include <ros/ros.h>
 #include <ros/console.h>
-
-#include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
-
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Point.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
-
 #include "backward.hpp"
 #include "time_optimizer.h"
 #include "trajectory_generator_waypoint.h"
