@@ -1,9 +1,9 @@
 # TimeOptimizer
 ## 1.Introduction
 
-TODO::
+TODO:: add visualization of the optimized time, velocity and acceleration
 
-TimeOptimizer 
+TimeOptimizer is a tool to do re-timing of an arbitrary given piecewise polynomial-based trajectory (no matter monomial polynomial, Bezier curve, B-spline or others). The objective of this work is to map the original parametrization variable to a new time variable, with which the trajectory can finish as fast as possible and respect all kinodynamic limits (velocity, accleration).
 For details we refer readers to our paper.
 
 **Authors:**[Fei Gao](https://ustfei.com/) and [Shaojie Shen](http://www.ece.ust.hk/ece.php/profile/facultydetail/eeshaojie) from the [HUKST Aerial Robotics Group](uav.ust.hk).
@@ -33,6 +33,8 @@ If you use this planning framework for your academic research, please cite our r
 	Year = {2018}}
 }
 ```
+**Implementation**
+
 ## 2.Prerequisities
 - Our testing environment: **Ubuntu** 16.04, **ROS** Kinetic.
 - 
