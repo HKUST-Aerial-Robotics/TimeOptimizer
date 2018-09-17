@@ -14,6 +14,7 @@ public:
         ~TrajectoryGeneratorWaypoint();
 
         Eigen::MatrixXd PolyQPGeneration(
+            const int order,
             const Eigen::MatrixXd &Path,
             const Eigen::MatrixXd &Vel,
             const Eigen::MatrixXd &Acc,

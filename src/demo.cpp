@@ -1,5 +1,6 @@
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <math.h>
 #include <eigen3/Eigen/Dense>
 #include <random>
@@ -25,7 +26,7 @@ namespace backward {
     double _vis_traj_width;
     double _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s;
     double _start_x, _start_y, _start_z;
-    int _traj_order, _min_order, _poly_num1D;
+    int _dev_order, _min_order, _poly_num1D;
 
 // ros related
     ros::Subscriber _way_pts_sub;
@@ -52,7 +53,7 @@ namespace backward {
     void trajGeneration(Eigen::MatrixXd path);
     void rcvWaypointsCallback(const nav_msgs::Path & wp);
 
-#if 0
+#if 1
 void pubCmd()
 {   
     if(_traj_finish == false)
@@ -320,11 +321,44 @@ void pubCmd()
         _vis_acc_pub.publish(_vis_acc);
     }
 }
+
+#else
+ofstream pos_result, vel_result, acc_result;
+void pubCmd()
+{
+    if(_has_traj == false)
+        return;
+    else if( ros::Time::now() > _traj_time_final)
+        return;
+
+    double t = max(0.0, ( ros::Time::now() - _traj_time_start ).toSec() );
+    cout<<"t: "<<t<<endl;
+
+    Vector3d pos, vel, acc;
+    for (int idx = 0; idx < _polyCoeff.rows(); ++idx)
+    {
+        if (t > _polyTime[idx] && idx + 1 < _polyCoeff.rows())
+        {
+            t -= _polyTime[idx];
+        }
+        else
+        {   
+            pos = getPosPoly(_polyCoeff, idx, t);
+            vel = getVelPoly(_polyCoeff, idx, t);
+            acc = getAccPoly(_polyCoeff, idx, t);
+
+            pos_result << pos(0)<<","<<pos(1)<<","<<pos(2)<<endl;
+            vel_result << vel(0)<<","<<vel(1)<<","<<vel(2)<<endl;
+            acc_result << acc(0)<<","<<acc(1)<<","<<acc(2)<<endl;
+            break;
+        } 
+    }
+}
 #endif
 
 void rcvWaypointsCallback(const nav_msgs::Path & wp)
-{    
-    cout<<": rcv waypoints"<<endl;
+{   
+    //cout<<": rcv waypoints"<<endl;
     vector<Vector3d> wp_list;
     wp_list.clear();
 
@@ -384,13 +418,12 @@ VectorXd timeAllocation( MatrixXd Path)
     return time;
 }
 
-VectorXd timeAllocationNaive(VectorXd path)
+VectorXd timeAllocationNaive(MatrixXd Path)
 {   
-    VectorXd time;
-    time.resize(path.rows() - 1);
+    VectorXd time(Path.rows() - 1);
 
-    for(int i = 0; i < time.size(); i++)
-        time(i) = 1.0;
+    for(int i = 0; i < (Path.rows() - 1); i++)
+        time(i) = 2.0;
 
     return time;
 }
@@ -404,14 +437,13 @@ void trajGeneration(Eigen::MatrixXd path)
     MatrixXd acc = MatrixXd::Zero(2,3);
 
     _polyTime  = timeAllocation(path); 
-    _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(path, vel, acc, _polyTime);   
+    //_polyTime  = timeAllocationNaive(path); 
+    _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(_dev_order, path, vel, acc, _polyTime);   
     
-    cout<<"_polyCoeff: \n"<<_polyCoeff<<endl;
-
     visWayPointPath(path);
     visWayPointTraj( _polyCoeff, _polyTime);
 
-    time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
+  /*  time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
     _time_allocator = time_optimizer.GetTimeAllcoation();
 
     _has_traj = true;    
@@ -422,7 +454,10 @@ void trajGeneration(Eigen::MatrixXd path)
         int K = _time_allocator->K(i);
         _traj_time_final += ros::Duration(_time_allocator->time(i, K - 1));
     }
-
+*/
+    _has_traj = true;    
+    _traj_time_start = ros::Time::now();
+    _traj_time_final = _traj_time_start + ros::Duration(_polyTime.sum());
     cout<<"start and final time: "<<_traj_time_start<<" , "<<_traj_time_final<<endl;
 }
 
@@ -439,8 +474,8 @@ int main(int argc, char** argv)
     nh.param("planning/max_vel",   _MAX_Vel,   1.0 );
     nh.param("planning/max_acc",   _MAX_Acc,   1.0 );
     nh.param("planning/max_d_acc", _MAX_d_Acc, 1.0 );
-    nh.param("planning/traj_order", _traj_order, 6 );
-    nh.param("planning/min_order",  _min_order,  3 );
+    nh.param("planning/dev_order", _dev_order,  3 );
+    nh.param("planning/min_order", _min_order,  3 );
 
     nh.param("vis/vis_traj_width", _vis_traj_width,  0.15);
     
@@ -453,7 +488,7 @@ int main(int argc, char** argv)
     _vis_vel_pub     = nh.advertise<visualization_msgs::Marker>("desired_velocity", 50);    
     _vis_acc_pub     = nh.advertise<visualization_msgs::Marker>("desired_acceleration", 50);
 
-    _poly_num1D = _traj_order + 1;
+    _poly_num1D = 2 * _dev_order;
 
     _vis_pos.ns = "pos";
     _vis_pos.id = 0;
@@ -494,15 +529,26 @@ int main(int argc, char** argv)
     _vis_acc.scale.y = 0.4;
     _vis_acc.scale.z = 0.4;
 
+    /*auto pos_path   = "/home/bbgf/pos.txt";
+    auto vel_path   = "/home/bbgf/vel.txt";
+    auto acc_path   = "/home/bbgf/acc.txt";
+    pos_result.open(pos_path);
+    vel_result.open(vel_path);
+    acc_result.open(acc_path);*/
+
     ros::Rate rate(100);
     bool status = ros::ok();
     while(status) 
     {
         ros::spinOnce();  
         status = ros::ok();
-        //pubCmd();
+        pubCmd();
         rate.sleep();
     }
+
+    /*pos_result.close();
+    vel_result.close();
+    acc_result.close();*/
 
     return 0;
 }
