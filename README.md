@@ -58,6 +58,7 @@ We use **mosek** for solvingsecond-order cone program(SOCP). To use mosek, you s
 If you have done all above, you can try the simple demo in two ways.
 
 **1.**
+Use the interactive tools we provide, and use following launch file:
 ```
   roslaunch time_optimizer time_optimizer.launch
 ```
