@@ -23,9 +23,8 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
             const Eigen::VectorXd &Time)          // time allocation in each segment
 {     
     // enforce initial and final velocity and accleration, for higher order derivatives, just assume them be 0;
-    cout<<"d_order: "<<d_order<<endl;
     int p_order = 2 * d_order - 1; // the order of polynomial
-    int p_num1d   = p_order + 1;     // the number of variables in each segment
+    int p_num1d   = p_order + 1;   // the number of variables in each segment
 
     int m = Time.size();
     MatrixXd PolyCoeff(m, 3 * p_num1d);
@@ -60,10 +59,6 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
 
     MatrixXd A_inv   = A.inverse();
 
-    cout<<"A:\n"<<A<<endl;
-    cout<<"inverse A:\n"<<A_inv<<endl;
-
-    //ROS_WARN("[Generator] A finished");
     /*   Produce the dereivatives in X, Y and Z axis directly.  */
     VectorXd Dx = VectorXd::Zero(m * p_num1d);
     VectorXd Dy = VectorXd::Zero(m * p_num1d);
@@ -109,7 +104,6 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
 
     _Q = H; // Now only minumum snap is used in the cost
 
-    ROS_WARN("[Generator] Q finished");
     if( m > 1)
     {   
         MatrixXd Ct; // The transpose of selection matrix C
@@ -120,38 +114,12 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
         num_f = d_order + d_order + (m - 1) * (d_order - 1); // fixed
         num_p = (m - 1) * (d_order - 1);                     // free
 
-        cout<<"num_p: "<<num_p<<endl;
+        /*cout<<"num_p: "<<num_p<<endl;
         cout<<"num_f: "<<num_f<<endl;
         cout<<"num_d: "<<num_d<<endl;
-
+*/
         Ct = MatrixXd::Zero(num_d, num_f + num_p); 
-        /*
-        num_f = 2 * m + 4; //3 + 3 + (m - 1) * 2 = 2m + 4  // fixed
-        num_p = 2 * m - 2; //(m - 1) * 2 = 2m - 2          // free
-        
-        Ct( 0, 0 ) = 1; Ct( 2, 1 ) = 1;         Ct( 4, 2 ) = 1; // stack the start point
-        Ct( 1, 3 ) = 1; Ct( 3, 2 * m + 4 ) = 1; Ct( 5, 2 * m + 5 ) = 1; 
-        
-        Ct(p_num1d * (m - 1) + 0, 2 * m + 0) = 1; 
-        Ct(p_num1d * (m - 1) + 1, 2 * m + 1) = 1; // Stack the end point
-        Ct(p_num1d * (m - 1) + 2, 4 * m + 0) = 1;
-        Ct(p_num1d * (m - 1) + 3, 2 * m + 2) = 1; // Stack the end point
-        Ct(p_num1d * (m - 1) + 4, 4 * m + 1) = 1;
-        Ct(p_num1d * (m - 1) + 5, 2 * m + 3) = 1; // Stack the end point
-        
-        for(int j = 2; j < m; j ++ ){
-              Ct( 6 * (j - 1) + 0, 2 + 2 * (j - 1)         + 0 ) = 1;
-              Ct( 6 * (j - 1) + 1, 2 + 2 * (j - 1)         + 1 ) = 1;
-         
-              Ct( 6 * (j - 1) + 2, 2 * m + 4 + 2 * (j - 2) + 0 ) = 1;
-              Ct( 6 * (j - 1) + 4, 2 * m + 4 + 2 * (j - 2) + 1 ) = 1;
-         
-              Ct( 6 * (j - 1) + 3, 2 * m + 4 + 2 * (j - 1) + 0 ) = 1;
-              Ct( 6 * (j - 1) + 5, 2 * m + 4 + 2 * (j - 1) + 1 ) = 1;
-        }
-        */
-        
-        //ROS_WARN("for the 1st segment");
+
         // for the 1st segment
         { 
           // enforcing the start states
@@ -166,7 +134,6 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
               Ct( i * 2 + 1, num_f - 1 + i ) = 1;  
         }
 
-        //ROS_WARN("for the last segment");
         // for the last segment
         { 
           // enforcing the final states
@@ -183,7 +150,6 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
           }
         }
 
-        //ROS_WARN("for all middle segments");
         // for all meddle segments
         for(int j = 1; j < m - 1; j ++ )
         {   
@@ -202,17 +168,13 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
         C = Ct.transpose();
         MatrixXd A_invC  = A_inv * Ct;
 
-        ROS_WARN("[Generator] case m > 1, C finished");
         VectorXd Dx1 = C * Dx;
         VectorXd Dy1 = C * Dy;
         VectorXd Dz1 = C * Dz;
 
-        //ROS_WARN("[Generator] case segment > 1");
         MatrixXd R   = A_invC.transpose() * _Q *  A_invC;
         
-        ROS_WARN("[Generator] case m > 1, R finished");
         VectorXd Dxf(num_f), Dyf(num_f), Dzf(num_f);
-        
         Dxf = Dx1.segment( 0, num_f );
         Dyf = Dy1.segment( 0, num_f );
         Dzf = Dz1.segment( 0, num_f );
@@ -228,31 +190,25 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
         Rpp = R.block(num_f, num_f, num_p, num_p);
 
         MatrixXd Rpp_inv = Rpp.inverse();
-        ROS_WARN("[Generator] case m > 1, R blocks finished");
+
         VectorXd Dxp(num_p), Dyp(num_p), Dzp(num_p);
         Dxp = - (Rpp_inv * Rfp.transpose()) * Dxf;
         Dyp = - (Rpp_inv * Rfp.transpose()) * Dyf;
         Dzp = - (Rpp_inv * Rfp.transpose()) * Dzf;
 
-        ROS_WARN("[Generator] case m > 1, Dp blocks finished");
         Dx1.segment(num_f, num_p) = Dxp;
         Dy1.segment(num_f, num_p) = Dyp;
         Dz1.segment(num_f, num_p) = Dzp;
 
-        ROS_WARN("[Generator] case m > 1, Dx1 resembled finished");
         Px = A_invC * Dx1;
         Py = A_invC * Dy1;
         Pz = A_invC * Dz1;
-
-        //cout<<"J: "<<Dx1.transpose() * R * Dx1 + Dy1.transpose() * R * Dy1 + Dz1.transpose() * R * Dz1<<endl;
     }
     else
     {   
-        ROS_WARN("[Generator] case segment = 1");
         Px = A_inv * Dx;
         Py = A_inv * Dy;
         Pz = A_inv * Dz;
-        //time_2 = ros::Time::now();
     }
 
     _Px = Px;
@@ -266,11 +222,6 @@ Eigen::MatrixXd TrajectoryGeneratorWaypoint::PolyQPGeneration(
         PolyCoeff.block(i, 2 * p_num1d, 1, p_num1d) = Pz.segment( i * p_num1d, p_num1d ).transpose();
     }
 
-    /*time_3 = ros::Time::now();
-    ROS_WARN("[Waypoint-Traj Solver] time in doing calculation is %f", (time_3 - time_2).toSec() );*/
-    //ROS_WARN("[Generator] Unconstrained QP solved");
-
-    //cout<<"objective: "<<_Px.transpose() * _Q * _Px + _Py.transpose() * _Q * _Py + _Pz.transpose() * _Q * _Pz<<endl;
     return PolyCoeff;
 }  
 

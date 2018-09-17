@@ -8,6 +8,8 @@ Panels:
         - /Trajectory1
         - /Trajectory1/Namespaces1
         - /Path1
+        - /Acc1
+        - /Vel1
       Splitter Ratio: 0.576470613
     Tree Height: 648
   - Class: rviz/Selection
@@ -80,21 +82,29 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /b_traj_server/desired_acceleration
+      Enabled: true
+      Marker Topic: /demo/desired_acceleration
       Name: Acc
       Namespaces:
-        {}
+        acc: true
       Queue Size: 100
-      Value: false
+      Value: true
     - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /b_traj_server/desired_velocity
+      Enabled: true
+      Marker Topic: /demo/desired_velocity
       Name: Vel
       Namespaces:
-        {}
+        vel: true
       Queue Size: 100
-      Value: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /demo/desired_position
+      Name: Pos
+      Namespaces:
+        pos: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 127
@@ -113,25 +123,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 36.6609306
+      Distance: 55.1336403
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 9.70363617
-        Y: -1.57856369
-        Z: -1.28707925e-05
+        X: 15.8312025
+        Y: 1.25171161
+        Z: -2.24075357e-05
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.29979718
+      Pitch: 1.04979682
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz)
-      Yaw: 4.51540089
+      Yaw: 4.33041286
     Saved:
       - Class: rviz/Orbit
         Distance: 79.2448425

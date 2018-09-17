@@ -9,13 +9,15 @@
       <param name="planning/start_z"    value="1.0" />
 
       <param name="planning/d_s"        value="0.025"/>
-      <param name="planning/max_vel"    value="4.0"/>
-      <param name="planning/max_acc"    value="3.0"/>
-      <param name="planning/max_d_acc"  value="3.0"/>
-      <param name="planning/dev_order"  value="4"  />
-      <param name="planning/min_order"  value="3"  />
+      <param name="planning/max_vel"    value="4.0"  />
+      <param name="planning/max_acc"    value="3.0"  />
+      <param name="planning/max_d_acc"  value="3.0"  />
+      <param name="planning/dev_order"  value="4"    />
+      <param name="planning/min_order"  value="3"    />
 
       <param name="vis/vis_traj_width"  value="0.15" />
+      <param name="vis/is_dump_data"    value="true" />
+      
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">        

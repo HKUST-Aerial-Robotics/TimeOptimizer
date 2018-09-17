@@ -27,6 +27,7 @@ namespace backward {
     double _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s;
     double _start_x, _start_y, _start_z;
     int _dev_order, _min_order, _poly_num1D;
+    bool _is_dump_data;
 
 // ros related
     ros::Subscriber _way_pts_sub;
@@ -37,6 +38,7 @@ namespace backward {
 // for planning
     MatrixXd _polyCoeff;
     VectorXd _polyTime;
+    int _segment_num;
     ros::Time _traj_time_start, _traj_time_final;
     bool _has_traj = false;
 // for visualization
@@ -53,30 +55,23 @@ namespace backward {
     void trajGeneration(Eigen::MatrixXd path);
     void rcvWaypointsCallback(const nav_msgs::Path & wp);
 
+ofstream pos_result, vel_result, acc_result;
 #if 1
 void pubCmd()
 {   
-    if(_traj_finish == false)
+    if( _has_traj == false || ros::Time::now() > _traj_time_final )
     {   
         return;
     }
-    else if(_odom_time > _traj_time_final)
-    {     
-
-    }   
     else
     { 
-        ROS_WARN("pub command");
         //publish position, velocity and acceleration command according to time bias
-        double t = (_odom_time - _traj_time_start).toSec();
-        if(t < 0) return;
-        //ROS_WARN("[Time Optimal Trajectory Node] publish command, time is %f", t);
-        
+        double t = max(0.0, (ros::Time::now() - _traj_time_start).toSec() );
         MatrixXd time     = _time_allocator->time;
         MatrixXd time_acc = _time_allocator->time_acc;
 
         int idx;
-        for(idx = 0; idx < _seg_num; idx++)
+        for(idx = 0; idx < _segment_num; idx++)
         {   
             int K = _time_allocator->K(idx);
             if( t  > time(idx, K - 1))
@@ -87,71 +82,55 @@ void pubCmd()
         double t_tmp = t;     
 
         int grid_num = _time_allocator->K(idx);
-        //ROS_WARN("[Time Optimal Trajectory Node] publish command, segm index is %d, segm time is %f", idx, t);
         
         // now we need to find which grid the time instance belongs to
         int grid_idx;
-        for(grid_idx = 0; grid_idx < _time_allocator->K(idx); grid_idx++)
-        {
-            if (t > time(idx, grid_idx))
-              continue;
-            else
-            { 
-                //cout<<"grid_idx: "<<grid_idx<<", time(idx, grid_idx): "<<time(idx, grid_idx)<<endl;
-                if(grid_idx > 0)
-                  t -= time(idx, grid_idx - 1);
-                else
-                  t -= 0.0;
-
+        for(grid_idx = 0; grid_idx < _time_allocator->K(idx); grid_idx++){
+            if (t > time(idx, grid_idx)) continue;
+            else{ 
+                if(grid_idx > 0) t -= time(idx, grid_idx - 1);
+                else             t -= 0.0;
                 break;
             }
         }
         
-        //ROS_WARN("[Time Optimal Trajectory Node] publish command, grid index is %d, grid time is %f", grid_idx, t);
         double delta_t;
         if(grid_idx > 0)
           delta_t = (time(idx, grid_idx) - time(idx, grid_idx - 1));
         else
           delta_t = time(idx, grid_idx) - 0.0;
-        // seemed has BUG ? shoudl be grid_idx - 1 ?
         
         double delta_s = t * _time_allocator->s_step / delta_t;
         double s = _time_allocator->s(idx, grid_idx) + delta_s;
 
-        //cout<<"s: "<<s<<endl;
-        Vector3d position_s = getPos(idx, s/_time_best(idx)) * _time_best(idx); 
+        // get position data 
+        Vector3d position_s = getPosPoly(_polyCoeff, idx, s); 
         Vector3d position   = position_s;
-        /*cout<<"getPos(idx, s): \n"<<getPos(idx, s)<<endl;
-        cout<<"position: \n"<<position<<endl;*/
 
+        // get velocity data
         double s_k   = _time_allocator->s(idx, grid_idx);
         double s_k_1 = _time_allocator->s(idx, grid_idx + 1);
         double b_k   = _time_allocator->b(idx, grid_idx);
         double b_k_1 = _time_allocator->b(idx, grid_idx + 1);
 
-        //cout<<"s_k: "<<s_k<<"normalized s_k: "<<s_k   /_time_best(idx)<<endl;
-        Vector3d velocity_s1 = getVel(idx, s_k   /_time_best(idx)); 
-        Vector3d velocity_s2 = getVel(idx, s_k_1 /_time_best(idx));
+        Vector3d velocity_s1 = getVelPoly(_polyCoeff, idx, s_k  ); 
+        Vector3d velocity_s2 = getVelPoly(_polyCoeff, idx, s_k_1);
 
         Vector3d velocity1   = velocity_s1 * sqrt(b_k);
         Vector3d velocity2   = velocity_s2 * sqrt(b_k_1);
-        //cout<<"velocity1: \n"<<velocity1<<endl;
         Vector3d velocity   = velocity1 + (velocity2 - velocity1) * t / delta_t;
 
-        // reset grid_idx and t for acc time
+// ### NOTE: From what above we get the position and velocity easily.
+// ###       positions are the same as the trajectory before re-timing; and velocity are obtained by interpolation between each grid.
+// ###       In what follows, we will get the accleration. It's more complicated since each acceleration ais evaluated at the middle of a grid        
+        // reset grid_idx and t for time acceleration axis
         t = t_tmp;
         for(grid_idx = 0; grid_idx < _time_allocator->K(idx); grid_idx++)
         {
-            if (t > time_acc(idx, grid_idx))
-              continue;
-            else
-            { 
-                //cout<<"grid_idx: "<<grid_idx<<", time(idx, grid_idx): "<<time(idx, grid_idx)<<endl;
-                if(grid_idx > 0)
-                  t -= time_acc(idx, grid_idx - 1);
-                else
-                  t -= 0.0;
-
+            if (t > time_acc(idx, grid_idx)) continue;
+            else{ 
+                if(grid_idx > 0) t -= time_acc(idx, grid_idx - 1);
+                else             t -= 0.0;
                 break;
             }
         }
@@ -159,12 +138,13 @@ void pubCmd()
         if(grid_idx == grid_num)
             t -= time_acc(idx, grid_num - 1);
 
-        //ROS_WARN("[Time Optimal Trajectory Node] publish command, grid index is %d, grid time is %f", grid_idx, t);
+        // prepare to do accleration interpolation
         Vector3d velocity_s, acceleration_s, acceleration1, acceleration2;
         Vector3d acceleration;
 
         double a_k;
-        if( grid_idx == 0 && idx == 0 )
+        // # special case 1: the very first grid of all segments of the trajectory, do interpolation in one grid
+        if( grid_idx == 0 && idx == 0 ) 
         {   
             s_k   = _time_allocator->s(idx, 0);
             s_k_1 = _time_allocator->s(idx, 0 + 1);
@@ -173,17 +153,15 @@ void pubCmd()
             b_k   = _time_allocator->b(idx, 0);
             b_k_1 = _time_allocator->b(idx, 0 + 1);
 
-            velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx));
-            acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx)) /_time_best(idx);
+            velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+            acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
             acceleration2 = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
             acceleration1 << 0.0, 0.0, 0.0;
             
-       /*     cout<<"acceleration2: \n"<<acceleration2<<endl;
-            cout<<"time_acc(0, 0): "<<time_acc(0, 0)<<endl;*/
-
             acceleration   = acceleration1 + (acceleration2 - acceleration1) * t / time_acc(0, 0); 
         }
-        else if( grid_idx == grid_num && idx == (_seg_num - 1) )
+        // # special case 2: the very last grid of all segments of the trajectory, do interpolation in one grid
+        else if( grid_idx == grid_num && idx == (_segment_num - 1) )
         {   
             s_k   = _time_allocator->s(idx, grid_num - 1);
             s_k_1 = _time_allocator->s(idx, grid_num);
@@ -192,14 +170,14 @@ void pubCmd()
             b_k   = _time_allocator->b(idx, grid_num - 1);
             b_k_1 = _time_allocator->b(idx, grid_num    );
 
-            velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx));
-            acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx)) / _time_best(idx);
+            velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+            acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
             acceleration = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
-            //cout<<"final acceleration: \n"<<acceleration<<endl;
-            //acceleration << 0.0, 0.0, 0.0;
         }
-        else
+        // # regular case: do interpolation between two grids
+        else 
         {   
+            // sub-case 1: two grids are in the same segment
             if(grid_idx < grid_num && grid_idx > 0) // take average accleration in a same segment
             {   
                 delta_t = (time_acc(idx, grid_idx) - time_acc(idx, grid_idx - 1));
@@ -211,11 +189,9 @@ void pubCmd()
                 b_k   = _time_allocator->b(idx, grid_idx - 1);
                 b_k_1 = _time_allocator->b(idx, grid_idx + 0);
 
-                velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx));
-                acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx)) / _time_best(idx);
+                velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
                 acceleration1 = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
-
-                //acceleration = acceleration1;
 
                 s_k   = _time_allocator->s(idx, grid_idx + 0);
                 s_k_1 = _time_allocator->s(idx, grid_idx + 1);
@@ -223,13 +199,13 @@ void pubCmd()
                 a_k   = _time_allocator->a(idx, grid_idx + 0);
                 b_k   = _time_allocator->b(idx, grid_idx + 0);
                 b_k_1 = _time_allocator->b(idx, grid_idx + 1);              
-                //cout<<"a_k: "<<a_k<<" , "<<"s_k: "<<s_k<<" , "<<"s_k+1: "<<s_k_1<<endl;
 
-                velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx));
-                acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx)) / _time_best(idx);
+                velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
                 acceleration2 = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
                 acceleration   = acceleration1 + (acceleration2 - acceleration1) * t / delta_t;   
             }
+            // sub-case 2: two grids are in consecutive segment, the current grid is in a segment's tail
             else if(grid_idx == grid_num)// take average accleration between two segments
             {   
                 delta_t = (time(idx, grid_num - 1) - time_acc(idx, grid_num - 1) + time_acc(idx + 1, 0) );
@@ -241,8 +217,8 @@ void pubCmd()
                 b_k   = _time_allocator->b(idx, grid_idx - 1);
                 b_k_1 = _time_allocator->b(idx, grid_idx);
 
-                velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx));
-                acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 /_time_best(idx)) / _time_best(idx);
+                velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
                 acceleration1 = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
                 s_k   = _time_allocator->s(idx + 1, 0);
                 s_k_1 = _time_allocator->s(idx + 1, 1);
@@ -251,14 +227,15 @@ void pubCmd()
                 b_k   = _time_allocator->b(idx + 1, 0);
                 b_k_1 = _time_allocator->b(idx + 1, 1);              
 
-                velocity_s     = getVel(idx + 1, (s_k + s_k_1 ) / 2.0 / _time_best(idx + 1));
-                acceleration_s = getAcc(idx + 1, (s_k + s_k_1 ) / 2.0 / _time_best(idx + 1)) / _time_best(idx + 1);
+                velocity_s     = getVelPoly(_polyCoeff, idx + 1, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx + 1, (s_k + s_k_1 ) / 2.0);
                 acceleration2 = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
                 acceleration  = acceleration1 + (acceleration2 - acceleration1) * t / delta_t;        
             }
+            // sub-case 3: two grids are in consecutive segment, the current grid is in a segment's head
             else if(grid_idx == 0)// take average accleration between two segments
             {   
-                int grid_num_k = _time_allocator->K(idx - 1); // last segment's grid num
+                int grid_num_k = _time_allocator->K(idx - 1);
                 delta_t = (time(idx - 1, grid_num_k - 1) - time_acc(idx - 1, grid_num_k - 1) + time_acc(idx, 0) );
                 
                 s_k   = _time_allocator->s(idx - 1, grid_num_k - 1);
@@ -268,8 +245,8 @@ void pubCmd()
                 b_k   = _time_allocator->b(idx - 1, grid_num_k - 1);
                 b_k_1 = _time_allocator->b(idx - 1, grid_num_k    );
 
-                velocity_s     = getVel(idx - 1, (s_k + s_k_1 ) / 2.0 / _time_best(idx - 1));
-                acceleration_s = getAcc(idx - 1, (s_k + s_k_1 ) / 2.0 / _time_best(idx - 1)) / _time_best(idx - 1);
+                velocity_s     = getVelPoly(_polyCoeff, idx - 1, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx - 1, (s_k + s_k_1 ) / 2.0);
                 acceleration1  = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
 
                 s_k   = _time_allocator->s(idx, 0);
@@ -279,18 +256,27 @@ void pubCmd()
                 b_k   = _time_allocator->b(idx, 0);
                 b_k_1 = _time_allocator->b(idx, 0 + 1);
 
-                velocity_s     = getVel(idx, (s_k + s_k_1 ) / 2.0 / _time_best(idx));
-                acceleration_s = getAcc(idx, (s_k + s_k_1 ) / 2.0 / _time_best(idx)) / _time_best(idx);
+                velocity_s     = getVelPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
+                acceleration_s = getAccPoly(_polyCoeff, idx, (s_k + s_k_1 ) / 2.0);
                 acceleration2  = velocity_s * a_k + acceleration_s * (b_k + b_k_1) / 2.0;
                 acceleration   = acceleration1 + (acceleration2 - acceleration1) * (t + time(idx - 1, grid_num_k - 1) - time_acc(idx - 1, grid_num_k - 1)) / delta_t;   
             } 
-            else
-              ROS_BREAK();
+            else {
+                // no else
+            }
         }
 
-        _vis_pos.header.stamp = _odom_time;
-        _vis_vel.header.stamp = _odom_time;
-        _vis_acc.header.stamp = _odom_time;
+        // dump data in 3 files
+        if(_is_dump_data)
+        {
+            pos_result << position(0)     <<","<< position(1)     <<","<< position(2)    << endl;
+            vel_result << velocity(0)     <<","<< velocity(1)     <<","<< velocity(2)    << endl;
+            acc_result << acceleration(0) <<","<< acceleration(1) <<","<< acceleration(2)<< endl;
+        }
+
+        _vis_pos.header.stamp = ros::Time::now();
+        _vis_vel.header.stamp = ros::Time::now();
+        _vis_acc.header.stamp = ros::Time::now();
         _vis_pos.points.clear();
         _vis_vel.points.clear();
         _vis_acc.points.clear();
@@ -323,7 +309,6 @@ void pubCmd()
 }
 
 #else
-ofstream pos_result, vel_result, acc_result;
 void pubCmd()
 {
     if(_has_traj == false)
@@ -358,7 +343,6 @@ void pubCmd()
 
 void rcvWaypointsCallback(const nav_msgs::Path & wp)
 {   
-    //cout<<": rcv waypoints"<<endl;
     vector<Vector3d> wp_list;
     wp_list.clear();
 
@@ -414,7 +398,6 @@ VectorXd timeAllocation( MatrixXd Path)
         time(k) = dtxyz;
     }
 
-    //ROS_WARN("[Benchmark] finish allocating time for waypoints trajecotry");
     return time;
 }
 
@@ -423,7 +406,7 @@ VectorXd timeAllocationNaive(MatrixXd Path)
     VectorXd time(Path.rows() - 1);
 
     for(int i = 0; i < (Path.rows() - 1); i++)
-        time(i) = 2.0;
+        time(i) = 1.0;
 
     return time;
 }
@@ -436,14 +419,14 @@ void trajGeneration(Eigen::MatrixXd path)
     MatrixXd vel = MatrixXd::Zero(2,3); 
     MatrixXd acc = MatrixXd::Zero(2,3);
 
-    _polyTime  = timeAllocation(path); 
-    //_polyTime  = timeAllocationNaive(path); 
+    _polyTime  = timeAllocation(path); //_polyTime  = timeAllocationNaive(path); 
     _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(_dev_order, path, vel, acc, _polyTime);   
-    
+    _segment_num = _polyCoeff.rows();
+
     visWayPointPath(path);
     visWayPointTraj( _polyCoeff, _polyTime);
 
-  /*  time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
+    time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
     _time_allocator = time_optimizer.GetTimeAllcoation();
 
     _has_traj = true;    
@@ -454,10 +437,7 @@ void trajGeneration(Eigen::MatrixXd path)
         int K = _time_allocator->K(i);
         _traj_time_final += ros::Duration(_time_allocator->time(i, K - 1));
     }
-*/
-    _has_traj = true;    
-    _traj_time_start = ros::Time::now();
-    _traj_time_final = _traj_time_start + ros::Duration(_polyTime.sum());
+
     cout<<"start and final time: "<<_traj_time_start<<" , "<<_traj_time_final<<endl;
 }
 
@@ -477,7 +457,8 @@ int main(int argc, char** argv)
     nh.param("planning/dev_order", _dev_order,  3 );
     nh.param("planning/min_order", _min_order,  3 );
 
-    nh.param("vis/vis_traj_width", _vis_traj_width,  0.15);
+    nh.param("vis/vis_traj_width", _vis_traj_width, 0.15);
+    nh.param("vis/is_dump_data",   _is_dump_data,   true);
     
     _way_pts_sub     = nh.subscribe( "waypoints",  1, rcvWaypointsCallback );
 
@@ -529,12 +510,15 @@ int main(int argc, char** argv)
     _vis_acc.scale.y = 0.4;
     _vis_acc.scale.z = 0.4;
 
-    /*auto pos_path   = "/home/bbgf/pos.txt";
-    auto vel_path   = "/home/bbgf/vel.txt";
-    auto acc_path   = "/home/bbgf/acc.txt";
-    pos_result.open(pos_path);
-    vel_result.open(vel_path);
-    acc_result.open(acc_path);*/
+    if(_is_dump_data)
+    {
+        auto pos_path   = "/home/bbgf/pos.txt";
+        auto vel_path   = "/home/bbgf/vel.txt";
+        auto acc_path   = "/home/bbgf/acc.txt";
+        pos_result.open(pos_path);
+        vel_result.open(vel_path);
+        acc_result.open(acc_path);
+    }
 
     ros::Rate rate(100);
     bool status = ros::ok();
@@ -546,9 +530,12 @@ int main(int argc, char** argv)
         rate.sleep();
     }
 
-    /*pos_result.close();
-    vel_result.close();
-    acc_result.close();*/
+    if(_is_dump_data)
+    {
+        pos_result.close();
+        vel_result.close();
+        acc_result.close();
+    }
 
     return 0;
 }

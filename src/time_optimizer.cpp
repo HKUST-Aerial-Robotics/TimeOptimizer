@@ -21,8 +21,7 @@ MinimumTimeOptimizer::MinimumTimeOptimizer(){};
 MinimumTimeOptimizer::~MinimumTimeOptimizer(){};
 
 void MinimumTimeOptimizer::MinimumTimeGeneration( 
-    const MatrixXd & polyCoeff, 
-    VectorXd & time, 
+    const MatrixXd & polyCoeff, VectorXd & time, 
     const double & maxVel, 
     const double & maxAcc, 
     const double & maxdAcc, 
@@ -30,7 +29,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
 {
     /* minimum time physical feasible trajectory time allocator. */
     /* objective is to generate motion as fast as possible within the physical limitaion (vel, acc and jerk). */
-    //ROS_ERROR("[Time Optimizer] weight_a is %f", w_a);
     _P          = polyCoeff;
     _seg_num    = polyCoeff.rows();
     _poly_num1D = polyCoeff.cols() / 3;
@@ -70,7 +68,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         for(int i = 0; i < K + 1; i++)
             s_k(i) = i * d_s;
 
-        //cout<<"check s_k in this segment: \n"<<s_k<<endl;
         s_list.push_back(s_k);
 
         num_a[k] = K; 
@@ -186,7 +183,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         else
             cb_eq = make_pair( MSK_BK_FX, make_pair( 1.0, 1.0 ) ); 
 
-        //cout<<"cb_eq: "<<cb_eq.second.first<<" , "<<cb_eq.second.second<<endl;
         con_bdk.push_back(cb_eq);
     }
 
@@ -195,8 +191,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         pair<MSKboundkeye, pair<double, double> > cb_ie = make_pair( MSK_BK_RA, make_pair( - maxJer_s, + maxJer_s ) ); 
         con_bdk.push_back(cb_ie);   
     }
-
-    //cout<<"_inequ_acc_conti_num: "<<_inequ_acc_conti_num<<endl;
 
     for(int i = 0; i < _inequ_vel_num; i++)
     {
@@ -242,25 +236,27 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
     r = MSK_makeenv( &env, NULL ); 
     r = MSK_maketask(env, _con_num, _var_num, &task); 
 
-// Parameters used in the optimizer
+// Parameters used in the optimizer; If you want to change the parameters, please refer to MOSEK's manual first
 //######################################################################
     MSK_putintparam (task, MSK_IPAR_OPTIMIZER , MSK_OPTIMIZER_CONIC );
     //MSK_putintparam (task, MSK_IPAR_NUM_THREADS, 4);
     //MSK_putdouparam (task, MSK_DPAR_CHECK_CONVEXITY_REL_TOL, 1e-5);
-    /*MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_DFEAS,  1e-15);
-    MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_PFEAS,  1e-15);
-    MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_INFEAS, 1e-15);*/
+    //MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_DFEAS,  1e-15);
+    //MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_PFEAS,  1e-15);
+    //MSK_putdouparam (task, MSK_DPAR_INTPNT_CO_TOL_INFEAS, 1e-15);
 
-//######################################################################
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+// IMPORTANT: If you want to see the detailed iterations in MOSEK solver, uncomment the following line.
+//r = MSK_linkfunctotaskstream(task,MSK_STREAM_LOG,NULL,printstr); 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-    //r = MSK_linkfunctotaskstream(task,MSK_STREAM_LOG,NULL,printstr); 
     if ( r == MSK_RES_OK ) 
     {
         r = MSK_appendcons(task, _con_num);  
         r = MSK_appendvars(task, _var_num); 
     }
 
-    //ROS_WARN("[Time Optimizer] Stacking the variable bounds. ");   
+    // Stacking the variable bounds.   
     for(j = 0; j<_var_num && r == MSK_RES_OK; ++j){       // Set the bounds on variable j : //  blx[j] <= x_j <= bux[j] 
         if (r == MSK_RES_OK) 
             r = MSK_putvarbound(task, 
@@ -270,14 +266,12 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
                                 var_bdk_n[j].second.second ); // Numerical value of upper bound.      
     } 
     
-    //ROS_WARN("[Time Optimizer] Stacking the constraints bounds. ");   
+    // Stacking the constraints bounds.   
     //   for i=1, ...,con_num : blc[i] <= constraint i <= buc[i] 
     assert(_con_num == (int)con_bdk.size());
 
     for( i = 0; i < _con_num && r == MSK_RES_OK; i++ ) 
     {
-        //cout<<con_bdk[i].second.first<<" , "<<con_bdk[i].second.second<<endl;
-        
         r = MSK_putconbound(task, 
                             i,                            // Index of constraint. 
                             con_bdk[i].first,             // Bound key.
@@ -288,8 +282,8 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
 
     int row_idx = 0;
     int idx_bias = 0;
-    //ROS_WARN("[Time Optimizer] Stacking the equality constraints. ");   
-    //ROS_WARN("[Time Optimizer] For equality constraints of mapping b_k to a_k");   
+
+    // For equality constraints of mapping b_k to a_k   
     // b_k+1 - b_K - 2 * a_k * d_s == 0.0;
     // ==> - 2 * d_s * a_k - b_K + b_k+1 == 0.0;
     for(int k = 0; k < _seg_num; k ++) // mapping b to a for each segment of the trajectory
@@ -309,40 +303,35 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             asub[1] = idx_bias + num_a[k] + i;
             asub[2] = idx_bias + num_a[k] + i + 1;
             r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-            //cout<<"row_idx: "<<row_idx<<endl;
+
             row_idx ++;
         }
         idx_bias += num_x[k];
     }
     
-    //ROS_WARN("[Time Optimizer] For equality constraints of continuity at velocity"); 
+    // For equality constraints of continuity at velocity 
     // continuous in b_k between each consecutive curve 
 #if 1    
     idx_bias = num_x[0];
     for(int k = 1; k < _seg_num; k ++) 
     {   
-        //int K = k_list[k];
         int nzi = 2;
         MSKint32t asub[nzi];
         double aval[nzi];
         aval[0] =  1.0;
         aval[1] = -1.0;
 
-        /*asub[0] = (k - 1) * num_x[k] + num_a[k] + num_b[k] - 1;
-        asub[1] =    k    * num_x[k] + num_a[k];*/
-
         asub[0] = idx_bias - num_x[k-1] + num_a[k-1] + num_b[k-1] - 1;
         asub[1] = idx_bias              + num_a[k];
 
         r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-        //cout<<"row_idx: "<<row_idx<<endl;
         row_idx ++;
-        //if(k < _seg_num - 1)
+
         idx_bias += num_x[k];
     }
 #endif
 
-    //ROS_WARN("[Time Optimizer] For equality constraints of mapping c_k+1 + c_k to e_k"); 
+    // For equality constraints of mapping c_k+1 + c_k to e_k
     // e_k = c_k + c_k+1
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
@@ -361,13 +350,12 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             asub[1] = idx_bias + num_a[k] + num_b[k] + i + 1;
             asub[2] = idx_bias + num_a[k] + num_b[k] + num_c[k] + num_d[k] + num_t[k] + i;
             r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-            //cout<<"row_idx: "<<row_idx<<endl;
             row_idx ++;
         }
         idx_bias += num_x[k];
     }
 
-    //ROS_WARN("[Time Optimizer] For equality constraints of mapping 2*c_k to f_k"); 
+    // For equality constraints of mapping 2*c_k to f_k 
     // f_k = 2 * c_k
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
@@ -390,7 +378,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         idx_bias += num_x[k];
     }
 
-    //ROS_WARN("[Time Optimizer] For equality constraints of mapping g_k to b_k - 1"); 
+    // For equality constraints of mapping g_k to b_k - 1 
     // g_k = b_k - 1
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
@@ -407,13 +395,13 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             asub[0] = idx_bias + num_a[k] + i;
             asub[1] = idx_bias + num_a[k] + num_b[k] + num_c[k] + num_d[k] + num_t[k] + num_e[k] + num_f[k] + i;
             r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-            //cout<<"row_idx: "<<row_idx<<endl;
+      
             row_idx ++;
         }
         idx_bias += num_x[k];
     }
 
-    //ROS_WARN("[Time Optimizer] For equality constraints of mapping h_k to b_k + 1"); 
+    // For equality constraints of mapping h_k to b_k + 1
     // h_k = b_k + 1
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
@@ -436,7 +424,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         idx_bias += num_x[k];
     }
     
-    //ROS_WARN("[Time Optimizer] For equality constraints of continuity at acceleration, by limiting piecewise deviation"); 
+    // For equality constraints of continuity at acceleration, by limiting piecewise deviation 
     // continuous in b_k between each consecutive curve 
 #if 1
     idx_bias = num_x[0];
@@ -444,18 +432,17 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
     {   
         int K   = k_list[k];
         int K_f = k_list[k-1];
-        //cout<<"K num of last seg: "<<K_f<<", K num of this seg: "<<K<<endl;
+
         VectorXd s_0 = s_list[k];
         VectorXd s_f = s_list[k-1];
         double s0 = (s_0(0)   + s_0(1))     / 2.0;
         double sf = (s_f(K_f) + s_f(K_f-1)) / 2.0;
-/*      cout<<s(K)<< " , "<<s(K-1)<<endl;
-        cout<<s0<< " , "<<sf<<endl;*/
-        Vector3d f_0 = getVel(k,   s0 / time(k)  );
-        Vector3d f_f = getVel(k-1, sf / time(k-1));
 
-        Vector3d h_0 = getAcc(k,   s0 / time(k))   / time(k);
-        Vector3d h_f = getAcc(k-1, sf / time(k-1)) / time(k - 1);
+        Vector3d f_0 = getVel(k,   s0 );
+        Vector3d f_f = getVel(k-1, sf);
+
+        Vector3d h_0 = getAcc(k,   s0);
+        Vector3d h_f = getAcc(k-1, sf);
 
         for(int i = 0; i < 3; i++) //for x, y, and z axis    
         {
@@ -477,19 +464,15 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             asub[3] = idx_bias;
             asub[4] = idx_bias + num_a[k];
             asub[5] = idx_bias + num_a[k] + 1;
-          /*  cout<<"row_idx: "<<row_idx<<endl;
-            cout<<"sub: "<<asub[0]<<" , "<<asub[1]<<" , "<<asub[2]<<" , "<<asub[3]<<" , "<<asub[4]<<" , "<<asub[5]<<endl;*/
 
             r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-            //cout<<"row_idx: "<<row_idx<<endl;
             row_idx ++;
         }
-        //if(k < _seg_num - 1)
         idx_bias += num_x[k];
     }
 #endif
 
-    //ROS_WARN("[Time Optimizer] For inequality constraints of constraining velocity within limit"); 
+    // For inequality constraints of constraining velocity within limit 
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
     {   
@@ -497,7 +480,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         VectorXd s = s_list[k];
         for(int p = 0; p < K + 1; p ++)
         {
-            Vector3d f = getVel(k, s(p) / time(k) );
+            Vector3d f = getVel(k, s(p));
 
             for(int i = 0; i < 3; i++) //for x, y, and z axis    
             {
@@ -515,9 +498,9 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         idx_bias += num_x[k];
     }
 
-    //ROS_WARN("[Time Optimizer] For inequality constraints of constraining acceleration within limit"); 
+    // For inequality constraints of constraining acceleration within limit 
+
     idx_bias = 0;
-    //cout<<"row_idx: "<<row_idx<<endl;
     for(int k = 0; k < _seg_num; k ++) 
     {   
         int K = k_list[k];
@@ -525,8 +508,8 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         for(int p = 0; p < K; p ++)
         {   
             double s_a = (s(p) + s(p+1)) / 2.0;
-            Vector3d f = getVel(k, s_a / time(k));
-            Vector3d h = getAcc(k, s_a / time(k)) / time(k);
+            Vector3d f = getVel(k, s_a);
+            Vector3d h = getAcc(k, s_a);
             
             for(int i = 0; i < 3; i++) //for x, y and z axis    
             {
@@ -542,19 +525,16 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
                 asub[1] = idx_bias + num_a[k] + p;
                 asub[2] = idx_bias + num_a[k] + p + 1;
                 r = MSK_putarow(task, row_idx, nzi, asub, aval);    
-                //cout<<"row_idx: "<<row_idx<<endl;
-                // cout<<"sub: "<<asub[0]<<" , "<<asub[1]<<" , "<<asub[2]<<endl;
+                
                 row_idx ++;
             }
         }
 
         idx_bias += num_x[k];
     }
-    //cout<<"row_idx: "<<row_idx<<endl;
-    //ROS_ERROR("[SOLVER] acc limit constains num: %d", acc_ine_num);
 
 #if 1
-    //ROS_WARN("[Time Optimizer] For inequality constraints of constraining jerk within limit"); 
+    // For inequality constraints of constraining jerk within limit; 
     idx_bias = 0;
     for(int k = 0; k < _seg_num; k ++) 
     {   
@@ -566,11 +546,11 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             double s_a_2 = (s(p+1) + s(p+2)) / 2.0;
             //cout<<"s_a_1: "<<s_a_1<<endl;
 
-            Vector3d f_1 = getVel(k, s_a_1 / time(k));
-            Vector3d h_1 = getAcc(k, s_a_1 / time(k)) / time(k);
+            Vector3d f_1 = getVel(k, s_a_1);
+            Vector3d h_1 = getAcc(k, s_a_1);
 
-            Vector3d f_2 = getVel(k, s_a_2 / time(k));
-            Vector3d h_2 = getAcc(k, s_a_2 / time(k)) / time(k);
+            Vector3d f_2 = getVel(k, s_a_2);
+            Vector3d h_2 = getAcc(k, s_a_2);
 
             for(int i = 0; i < 3; i++) //for x, y and z axis    
             {
@@ -599,14 +579,14 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         idx_bias += num_x[k];
     }
 #endif   
-    //cout<<"row_idx: "<<row_idx<<endl;
 
-    //ROS_WARN("[Time Optimizer] Stacking all conic cones");
+    //Stacking all conic cones;
     idx_bias = 0;
     {   
         for(int k = 0; k < _seg_num; k++)
         {
             int K = k_list[k];
+            
             // 2 * d_k * e_k >= t_k^2
             for(int i = 0; i < K; i++)
             {   
@@ -639,7 +619,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         }
     }
 
-    //ROS_WARN("[Time Optimizer] Stacking the quadratic induced rotated cone");
+    //Stacking the quadratic induced rotated cone;
     {           
         int nzi = 2 + num_a_n;
         MSKint32t csub[nzi];                
@@ -664,7 +644,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         r = MSK_appendcone(task, MSK_CT_RQUAD, 0.0, nzi, csub);
     }
 
-   //ROS_WARN("[Time Optimizer] Stacking the objective function");
+   // Stacking the objective function
     int nzi = num_d_n + 1;
     MSKint32t asub[nzi];
     double aval[nzi];
@@ -692,11 +672,10 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
     if ( r==MSK_RES_OK ) 
          r = MSK_putobjsense(task, MSK_OBJECTIVE_SENSE_MINIMIZE);
     
-    //ros::Time time_opt = ros::Time::now();
+    // All is done, now call the SOCP solver
     bool solve_ok = false;
     if ( r==MSK_RES_OK ) 
       { 
-        //ROS_WARN("Prepare to solve the problem ");   
         MSKrescodee trmcode; 
         r = MSK_optimizetrm(task,&trmcode); 
         MSK_solutionsummary (task,MSK_STREAM_LOG); 
@@ -761,7 +740,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         printf("Error %s - '%s'\n",symname,desc); 
       } 
     
-    //ROS_WARN("[Time Optimizer Solver] final time is %f", _objective);
+    // Optimizing finish, now pull out of the solution
     VectorXd sol(_var_num);
  
     vector<VectorXd> a_list, b_list, c_list, d_list;
@@ -793,23 +772,14 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         num_x_k += num_x[k];
     }
 
-    //ROS_WARN("[Time Optimizer Solver] final time is %f", T);
-  /*  ROS_WARN("check optimized parametrization");
-    cout<<time<<endl;*/
-
-    ROS_WARN("Stacking the output results");
-
+    // Stacking the output results
     int max_K = -1;
     for(int i = 0; i < _seg_num; i++)
     {
         if(k_list(i) > max_K)
             max_K = k_list(i);
     }
-    /*cout<<" see all the K: \n"<<k_list<<endl;
-    cout<<" see the max K: "  <<max_K <<endl;*/
 
-    // double _s_step, int _K, double _vel_m, double _acc_m, double _jer_m
-    //delete time_allocator;
     time_allocator = new Allocator(_seg_num, d_s, max_K, maxVel, maxAcc, maxJer_s);
     num_x_k = 0;
     for(int k = 0; k < _seg_num; k++)
@@ -848,12 +818,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
 
         num_x_k += num_x[k];
     }
-
-/*    ROS_ERROR("check s distribution");
-    cout<<time_allocator->s<<endl;
-    
-    ROS_ERROR("check time optimization solution a");
-    cout<<time_allocator->a<<endl;*/
 
     MSK_deletetask(&task); 
     MSK_deleteenv(&env); 
@@ -907,32 +871,6 @@ Vector3d MinimumTimeOptimizer::getAccPoly(int k, double s)
 
         ret(dim) = coeff.dot(t);
     }
-
-    return ret;
-}
-
-Vector3d MinimumTimeOptimizer::getVelBezier(int k, double s)
-{
-    Vector3d ret = VectorXd::Zero(3);
-    for(int i = 0; i < 3; i++)
-        for(int j = 0; j < _ctrl_num1D; j++)
-            if(j < _ctrl_num1D - 1 )
-                ret(i) += _Cv(j) * _poly_order 
-                              * ( _P(k, i * _ctrl_num1D + j + 1) - _P(k, i * _ctrl_num1D + j))
-                              * pow(s, j) * pow((1 - s), (_poly_order - j - 1) ); 
-
-    return ret;
-}
-
-Vector3d MinimumTimeOptimizer::getAccBezier(int k, double s)
-{
-    Vector3d ret = VectorXd::Zero(3);
-    for(int i = 0; i < 3; i++)
-        for(int j = 0; j < _ctrl_num1D; j++)
-            if(j < _ctrl_num1D - 2 )
-              ret(i) += _Ca(j) * _poly_order * (_poly_order- 1) 
-                        * ( _P(k, i * _ctrl_num1D + j + 2) - 2 * _P(k, i * _ctrl_num1D + j + 1) + _P(k, i * _ctrl_num1D + j))
-                        * pow(s, j) * pow((1 - s), (_poly_order - j - 2) );                         
 
     return ret;
 }
