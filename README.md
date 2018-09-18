@@ -38,8 +38,6 @@ If you use this planning framework for your academic research, please cite our r
 ## 2.Prerequisities
 - Our testing environment: **Ubuntu** 16.04, **ROS** Kinetic.
 - If you want to use the interactive tool to set waypoints for the trajectory, please follow **5.1** to compile the tools in folder 'utils'. Otherwise just clone this package and compile and run. Remember to approve a license from **mosek** following **4**.
-```
-```
 
 ## 3.Build on ROS
   Clone the repository to your catkin workspace and catkin_make. For example:
@@ -58,13 +56,13 @@ We use **mosek** for solvingsecond-order cone program(SOCP). To use mosek, you s
 If you have done all above, you can try the simple demo in two ways.
 
 **1.**
-We provide a clean launch file which has no dependence on other packages, suppose you do not want to configure the interactive tools we provide. In this way, you can write down you the coordinates of all waypoints in the 'traj.json' file under the root directory of this package, and the program would read it after launching:
+We provide a clean launch file which has no dependence on other packages, suppose you do not want to configure the interactive tools we provide. In this way, you can write down you the coordinates of all waypoints in the **traj.json** file under the root directory of this package, and the program would read it after launching:
 ```
   roslaunch time_optimizer clean_demo.launch
 ```
 
 **2.**
-If you want to use the interactive tools we provide. Delete the file named 'CATKIN_IGNORE' under the directories of two additional ros-packages 'rviz_plugins' and 'waypoint_generator' in 'utils', and 'catkin_make' to compile them.
+If you want to use the interactive tools we provide. Delete the file named 'CATKIN_IGNORE' under the directories of two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**, and run 'catkin_make' to compile them.
 
 Then run following command:
 ```
@@ -74,11 +72,22 @@ In rviz, click 'Panels -> tools -> +' and select the plugin 'Goal3DTool'. If you
 
 We use *3D Nav Goal* to send waypoints for the drone. To use it, click the tool (shortcut keyboard 'g' may conflict with *2D Nav Goal*), then press on left mouse button on a position in rviz, click right mouse button to start to drag it slide up or down for a targeting height (don't loose left button at this time). Finally you loose left mouse button and a series of waypoints will be sent to the planner, done.
 
-## 6.Acknowledgements
+**Examples**
+
+
+## 6.Visualization the results
+The entire pipeline is : setting waypoints -> generating spatial trajectory -> time optimization -> publishing commands (position, velocity, acceleration). Commands can be viewed in rviz. Then, if you want to plot data of the final trajectory, plese run:
+```
+  roscd time_optimizer
+  sudo chmod +x draw.py
+  python draw.py
+```
+
+## 7.Acknowledgements
   We use [mosek](https://www.mosek.com/) for solving second-order cone program(SOCP).
 
-## 7.Licence
+## 8.Licence
 The source code is released under [GPLv3](http://www.gnu.org/licenses/) license.
 
-## 8.Notes
+## 9.Notes
 - The code has not been deeply tested, if you find any problems, do not hesitate to raise a issue or write e-mail to me.
