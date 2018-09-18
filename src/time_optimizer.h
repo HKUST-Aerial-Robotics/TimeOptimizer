@@ -4,32 +4,23 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "timeAllocator.h"
+#include "trajectory_base.h"
 
 class MinimumTimeOptimizer 
 {
 private:
-        double _T;    // the reulsted minimum time for a feasible travesal
         Eigen::MatrixXd _P;  // recording the polynomial's coefficients for further evaluation
+        Eigen::VectorXd _T;  // recording the polynomial's time durations
         int _seg_num, _poly_num1D;
 
         double _objective;
         Allocator * time_allocator; // for return the final result to high-level planer
 
-        Eigen::Vector3d getVel(int k, double s);
-        Eigen::Vector3d getAcc(int k, double s);
-
-        Eigen::Vector3d getVelPoly(int k, double s);
-        Eigen::Vector3d getAccPoly(int k, double s);
-
-        Eigen::Vector3d getVelBezier(int k, double s);
-        Eigen::Vector3d getAccBezier(int k, double s);
-
 public:
         MinimumTimeOptimizer();
         ~MinimumTimeOptimizer();
 
-        void MinimumTimeGeneration( const Eigen::MatrixXd & polyCoeff, 
-                                          Eigen::VectorXd & time,
+        int MinimumTimeGeneration( const Trajectory & traj,
                                     const double & maxVel, 
                                     const double & maxAcc,
                                     const double & maxdAcc,

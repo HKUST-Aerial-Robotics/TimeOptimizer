@@ -15,6 +15,9 @@
 #include "time_optimizer.h"
 #include "trajectory_generator_waypoint.h"
 
+// The trajectory class the demo use
+    #include "traj_poly_mono.h"
+
 using namespace std;
 using namespace Eigen;
 
@@ -422,23 +425,35 @@ void trajGeneration(Eigen::MatrixXd path)
     _polyTime  = timeAllocation(path); //_polyTime  = timeAllocationNaive(path); 
     _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(_dev_order, path, vel, acc, _polyTime);   
     _segment_num = _polyCoeff.rows();
+    cout<<"[TimeOptimizer DEMO] spatial trajectory generated"<<endl;
 
     visWayPointPath(path);
     visWayPointTraj( _polyCoeff, _polyTime);
 
-    time_optimizer.MinimumTimeGeneration( _polyCoeff, _polyTime, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s);   
-    _time_allocator = time_optimizer.GetTimeAllcoation();
-
-    _has_traj = true;    
+    TrajPolyMono polyTraj(_polyCoeff, _polyTime);
+    
     _traj_time_final = _traj_time_start = ros::Time::now();
-
-    for(int i = 0; i < _time_allocator->time.rows(); i++)
+    if(time_optimizer.MinimumTimeGeneration( polyTraj, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s))
     {   
-        int K = _time_allocator->K(i);
-        _traj_time_final += ros::Duration(_time_allocator->time(i, K - 1));
-    }
+        cout<<"[TimeOptimizer DEMO] temporal trajectory generated"<<endl;
+        _time_allocator = time_optimizer.GetTimeAllcoation();
+        _has_traj = true;    
 
-    cout<<"start and final time: "<<_traj_time_start<<" , "<<_traj_time_final<<endl;
+        for(int i = 0; i < _time_allocator->time.rows(); i++)
+        {   
+            int K = _time_allocator->K(i);
+            _traj_time_final += ros::Duration(_time_allocator->time(i, K - 1));
+        }
+
+        cout<<"[TimeOptimizer DEMO] now start publishing commands"<<endl;
+    }
+    else
+    {
+        cout<<"[TimeOptimizer DEMO] temporal optimization fail"<<endl;
+        cout<<"[TimeOptimizer DEMO] possible resons : " << "\n" <<
+        "1 - please check the spatial trajectory,"     <<  "\n" <<
+        "2 - numerical issue of the solver, try setting a larger d_s"<<endl;
+    }
 }
 
 int main(int argc, char** argv)

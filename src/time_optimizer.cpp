@@ -1,12 +1,7 @@
-#include <stdio.h>
-#include <ros/ros.h>
-#include <ros/console.h>
 #include <iostream>
-#include <fstream>
 #include <string>
 #include "time_optimizer.h"
 #include "mosek.h"
-#include "bezier_base.h"
 
 using namespace std;    
 using namespace Eigen;
@@ -20,8 +15,8 @@ MinimumTimeOptimizer::MinimumTimeOptimizer(){};
 
 MinimumTimeOptimizer::~MinimumTimeOptimizer(){};
 
-void MinimumTimeOptimizer::MinimumTimeGeneration( 
-    const MatrixXd & polyCoeff, VectorXd & time, 
+int MinimumTimeOptimizer::MinimumTimeGeneration( 
+    const Trajectory & traj,
     const double & maxVel, 
     const double & maxAcc, 
     const double & maxdAcc, 
@@ -29,9 +24,11 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
 {
     /* minimum time physical feasible trajectory time allocator. */
     /* objective is to generate motion as fast as possible within the physical limitaion (vel, acc and jerk). */
-    _P          = polyCoeff;
-    _seg_num    = polyCoeff.rows();
-    _poly_num1D = polyCoeff.cols() / 3;
+    _P          = traj.getP();
+    _T          = traj.getT();
+    _poly_num1D = traj.getO();
+
+    _seg_num    = _P.rows();
     double maxJer_s = maxdAcc * d_s;
 
     /*** ## Stacking bounds for all unknowns ## ***/ 
@@ -60,7 +57,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
     VectorXd k_list(_seg_num);
     for(int k = 0; k < _seg_num; k++)
     {
-        double duration  = time(k);
+        double duration  = _T(k);
         int K = ceil(duration / d_s);
 
         k_list[k] = K;
@@ -430,7 +427,6 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
     idx_bias = num_x[0];
     for(int k = 1; k < _seg_num; k ++) 
     {   
-        int K   = k_list[k];
         int K_f = k_list[k-1];
 
         VectorXd s_0 = s_list[k];
@@ -438,11 +434,11 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         double s0 = (s_0(0)   + s_0(1))     / 2.0;
         double sf = (s_f(K_f) + s_f(K_f-1)) / 2.0;
 
-        Vector3d f_0 = getVel(k,   s0 );
-        Vector3d f_f = getVel(k-1, sf);
+        Vector3d f_0 = traj.getVel(k,   s0 );
+        Vector3d f_f = traj.getVel(k-1, sf);
 
-        Vector3d h_0 = getAcc(k,   s0);
-        Vector3d h_f = getAcc(k-1, sf);
+        Vector3d h_0 = traj.getAcc(k,   s0);
+        Vector3d h_f = traj.getAcc(k-1, sf);
 
         for(int i = 0; i < 3; i++) //for x, y, and z axis    
         {
@@ -480,7 +476,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         VectorXd s = s_list[k];
         for(int p = 0; p < K + 1; p ++)
         {
-            Vector3d f = getVel(k, s(p));
+            Vector3d f = traj.getVel(k, s(p));
 
             for(int i = 0; i < 3; i++) //for x, y, and z axis    
             {
@@ -508,8 +504,8 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         for(int p = 0; p < K; p ++)
         {   
             double s_a = (s(p) + s(p+1)) / 2.0;
-            Vector3d f = getVel(k, s_a);
-            Vector3d h = getAcc(k, s_a);
+            Vector3d f = traj.getVel(k, s_a);
+            Vector3d h = traj.getAcc(k, s_a);
             
             for(int i = 0; i < 3; i++) //for x, y and z axis    
             {
@@ -546,11 +542,11 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             double s_a_2 = (s(p+1) + s(p+2)) / 2.0;
             //cout<<"s_a_1: "<<s_a_1<<endl;
 
-            Vector3d f_1 = getVel(k, s_a_1);
-            Vector3d h_1 = getAcc(k, s_a_1);
+            Vector3d f_1 = traj.getVel(k, s_a_1);
+            Vector3d h_1 = traj.getAcc(k, s_a_1);
 
-            Vector3d f_2 = getVel(k, s_a_2);
-            Vector3d h_2 = getAcc(k, s_a_2);
+            Vector3d f_2 = traj.getVel(k, s_a_2);
+            Vector3d h_2 = traj.getAcc(k, s_a_2);
 
             for(int i = 0; i < 3; i++) //for x, y and z axis    
             {
@@ -740,6 +736,11 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         printf("Error %s - '%s'\n",symname,desc); 
       } 
     
+    MSK_deletetask(&task); 
+    MSK_deleteenv(&env); 
+
+    if(!solve_ok) return 0;
+
     // Optimizing finish, now pull out of the solution
     VectorXd sol(_var_num);
  
@@ -768,7 +769,7 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
             opt_duration += 1.0 * 2 * d_s/(sqrt(b_k(i)) + sqrt(b_k(i+1)));
         }
 
-        time(k) = opt_duration;
+        //time(k) = opt_duration;
         num_x_k += num_x[k];
     }
 
@@ -819,58 +820,5 @@ void MinimumTimeOptimizer::MinimumTimeGeneration(
         num_x_k += num_x[k];
     }
 
-    MSK_deletetask(&task); 
-    MSK_deleteenv(&env); 
-}
-
-Vector3d MinimumTimeOptimizer::getVel(int k, double s)
-{
-    return getVelPoly(k ,s);
-}
-
-Vector3d MinimumTimeOptimizer::getAcc(int k, double s)
-{
-    return getAccPoly(k ,s);
-}
-
-Vector3d MinimumTimeOptimizer::getVelPoly(int k, double s)
-{
-    Vector3d ret;
-
-    for ( int dim = 0; dim < 3; dim++ )
-    {
-        VectorXd coeff = (_P.row(k) ).segment( dim * _poly_num1D, _poly_num1D );
-        VectorXd t = VectorXd::Zero( _poly_num1D );
-        
-        for(int j = 0; j < _poly_num1D; j ++)
-            if(j==0)
-                t(j) = 0.0;
-            else
-                t(j) = j * pow(s, j-1);
-
-        ret(dim) = coeff.dot(t);
-    }
-
-    return ret;
-}
-
-Vector3d MinimumTimeOptimizer::getAccPoly(int k, double s)
-{
-    Vector3d ret;
-
-    for ( int dim = 0; dim < 3; dim++ )
-    {
-        VectorXd coeff = (_P.row(k)).segment( dim * _poly_num1D, _poly_num1D );
-        VectorXd t = VectorXd::Zero( _poly_num1D );
-
-        for(int j = 0; j < _poly_num1D; j ++)
-            if( j==0 || j==1 )
-                t(j) = 0.0;
-            else
-                t(j) = j * (j - 1) * pow(s, j-2);
-
-        ret(dim) = coeff.dot(t);
-    }
-
-    return ret;
+    return 1;
 }
