@@ -73,9 +73,10 @@ In rviz, click 'Panels -> tools -> +' and select the plugin 'Goal3DTool'. If you
 We use *3D Nav Goal* to send waypoints for the drone. To use it, click the tool (shortcut keyboard 'g' may conflict with *2D Nav Goal*), then press on left mouse button on a position in rviz, click right mouse button to start to drag it slide up or down for a targeting height (don't loose left button at this time). Finally you loose left mouse button and a series of waypoints will be sent to the planner, done.
 
 **Examples**
-<img src="fig/example1.gif" alt="example1" width = "793" height = "300">
 
-<img src="fig/example2.gif" alt="example2" width = "793" height = "300">
+<img src="fig/example1.gif" alt="example1" width = "750" height = "450">
+
+<img src="fig/example2.gif" alt="example2" width = "750" height = "450">
 
 ## 6.Visualization the results
 The entire pipeline is : setting waypoints -> generating spatial trajectory -> time optimization -> publishing commands (position, velocity, acceleration). Commands can be viewed in rviz. Then, if you want to plot all commands of the final trajectory, plese run:
