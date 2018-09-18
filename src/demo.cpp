@@ -11,15 +11,19 @@
 #include <geometry_msgs/Point.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
-#include "backward.hpp"
-#include "time_optimizer.h"
-#include "trajectory_generator_waypoint.h"
+
+// Useful customized headers
+    #include "backward.hpp"
+    #include "time_optimizer.h"
+    #include "trajectory_generator_waypoint.h"
+    #include "json.hpp"
 
 // The trajectory class the demo use
     #include "traj_poly_mono.h"
 
 using namespace std;
 using namespace Eigen;
+using json = nlohmann::json;
 
 namespace backward {
     backward::SignalHandling sh;
@@ -30,7 +34,8 @@ namespace backward {
     double _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s;
     double _start_x, _start_y, _start_z;
     int _dev_order, _min_order, _poly_num1D;
-    bool _is_dump_data;
+    bool _is_dump_data, _is_use_inte;
+    string _pkg_path;
 
 // ros related
     ros::Subscriber _way_pts_sub;
@@ -422,22 +427,28 @@ void trajGeneration(Eigen::MatrixXd path)
     MatrixXd vel = MatrixXd::Zero(2,3); 
     MatrixXd acc = MatrixXd::Zero(2,3);
 
+    // give an arbitraty time allocation, all set all durations as 1 in the commented function.
     _polyTime  = timeAllocation(path); //_polyTime  = timeAllocationNaive(path); 
+
+    // generate a minimum-jerk piecewise monomial polynomial-based trajectory
     _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(_dev_order, path, vel, acc, _polyTime);   
     _segment_num = _polyCoeff.rows();
     cout<<"[TimeOptimizer DEMO] spatial trajectory generated"<<endl;
 
-    visWayPointPath(path);
-    visWayPointTraj( _polyCoeff, _polyTime);
-
+    // use this structure to evaluate this monomial polynomial trajectory in the time optimizer; 
+    // or your OWN implementation inheriting the base class for other types of piecewise trajectory (B-spline ...)
     TrajPolyMono polyTraj(_polyCoeff, _polyTime);
     
     _traj_time_final = _traj_time_start = ros::Time::now();
+
+    // run the time optimizer
     if(time_optimizer.MinimumTimeGeneration( polyTraj, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s))
     {   
-        cout<<"[TimeOptimizer DEMO] temporal trajectory generated"<<endl;
-        _time_allocator = time_optimizer.GetTimeAllcoation();
         _has_traj = true;    
+        cout<<"[TimeOptimizer DEMO] temporal trajectory generated"<<endl;
+        
+        // pull out the results in an allocator data structure
+        _time_allocator = time_optimizer.GetTimeAllcoation();
 
         for(int i = 0; i < _time_allocator->time.rows(); i++)
         {   
@@ -460,6 +471,9 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "time_optimizer_demo");
     ros::NodeHandle nh("~");
+
+    nh.param("demo/use_interactive", _is_use_inte, false);
+    nh.param("demo/pkg_path",        _pkg_path, string("") );
 
     nh.param("planning/start_x",   _start_x,   0.0 );
     nh.param("planning/start_y",   _start_y,   0.0 );
@@ -486,53 +500,76 @@ int main(int argc, char** argv)
 
     _poly_num1D = 2 * _dev_order;
 
-    _vis_pos.ns = "pos";
-    _vis_pos.id = 0;
-    _vis_pos.header.frame_id = "/map";
-    _vis_pos.type = visualization_msgs::Marker::SPHERE;
-    _vis_pos.action = visualization_msgs::Marker::ADD;
-    _vis_pos.color.a = 1.0;
-    _vis_pos.color.r = 0.0;
-    _vis_pos.color.g = 0.0;
-    _vis_pos.color.b = 0.0;
-    _vis_pos.scale.x = 0.2;
-    _vis_pos.scale.y = 0.2;
-    _vis_pos.scale.z = 0.2;
+    // define the visualization information of the published velocity and acceleration commands
+    {
+        _vis_pos.id = _vis_vel.id = _vis_acc.id = 0;
+        _vis_pos.header.frame_id = _vis_vel.header.frame_id = _vis_acc.header.frame_id = "/map";
+        
+        _vis_pos.ns = "pos";
+        _vis_pos.type   = visualization_msgs::Marker::SPHERE;
+        _vis_pos.action = visualization_msgs::Marker::ADD;
+        _vis_pos.color.a = 1.0; _vis_pos.color.r = 0.0; _vis_pos.color.g = 0.0; _vis_pos.color.b = 0.0;
+        _vis_pos.scale.x = 0.2; _vis_pos.scale.y = 0.2; _vis_pos.scale.z = 0.2;
 
-    _vis_vel.ns = "vel";
-    _vis_vel.id = 0;
-    _vis_vel.header.frame_id = "/map";
-    _vis_vel.type = visualization_msgs::Marker::ARROW;
-    _vis_vel.action = visualization_msgs::Marker::ADD;
-    _vis_vel.color.a = 1.0;
-    _vis_vel.color.r = 0.0;
-    _vis_vel.color.g = 1.0;
-    _vis_vel.color.b = 0.0;
-    _vis_vel.scale.x = 0.2;
-    _vis_vel.scale.y = 0.4;
-    _vis_vel.scale.z = 0.4;
+        _vis_vel.ns = "vel";
+        _vis_vel.type = visualization_msgs::Marker::ARROW;
+        _vis_vel.action = visualization_msgs::Marker::ADD;
+        _vis_vel.color.a = 1.0; _vis_vel.color.r = 0.0; _vis_vel.color.g = 1.0; _vis_vel.color.b = 0.0;
+        _vis_vel.scale.x = 0.2; _vis_vel.scale.y = 0.4; _vis_vel.scale.z = 0.4;
 
-    _vis_acc.ns = "acc";
-    _vis_acc.id = 0;
-    _vis_acc.header.frame_id = "/map";
-    _vis_acc.type = visualization_msgs::Marker::ARROW;
-    _vis_acc.action = visualization_msgs::Marker::ADD;
-    _vis_acc.color.a = 1.0;
-    _vis_acc.color.r = 1.0;
-    _vis_acc.color.g = 1.0;
-    _vis_acc.color.b = 0.0;
-    _vis_acc.scale.x = 0.2;
-    _vis_acc.scale.y = 0.4;
-    _vis_acc.scale.z = 0.4;
+        _vis_acc.ns = "acc";
+        _vis_acc.type = visualization_msgs::Marker::ARROW;
+        _vis_acc.action = visualization_msgs::Marker::ADD;
+        _vis_acc.color.a = 1.0; _vis_acc.color.r = 1.0; _vis_acc.color.g = 1.0; _vis_acc.color.b = 0.0;
+        _vis_acc.scale.x = 0.2; _vis_acc.scale.y = 0.4; _vis_acc.scale.z = 0.4;
+    }
 
+    // if want to plot data afterwards, write down all data in local files
     if(_is_dump_data)
     {
-        auto pos_path   = "/home/bbgf/pos.txt";
-        auto vel_path   = "/home/bbgf/vel.txt";
-        auto acc_path   = "/home/bbgf/acc.txt";
+        auto pos_path   = _pkg_path + "/pos.txt";
+        auto vel_path   = _pkg_path + "/vel.txt";
+        auto acc_path   = _pkg_path + "/acc.txt";
         pos_result.open(pos_path);
         vel_result.open(vel_path);
         acc_result.open(acc_path);
+    }
+
+    // wait 2 seconds for rviz to be launched.
+    sleep(2);
+
+    MatrixXd waypoints;
+    // if do not use the interactive tool, read waypoints directly from a local file.
+    if( !_is_use_inte )
+    {
+        std::string file = _pkg_path + "/traj.json";
+        std::ifstream f(file);
+        json          j;
+
+        f >> j;
+
+        int size;
+        vector<double> vectorX, vectorY, vectorZ;
+        vectorX = j["x"].get<std::vector<double> >();
+        vectorY = j["y"].get<std::vector<double> >();
+        vectorZ = j["z"].get<std::vector<double> >();
+
+        if (vectorX.size() == vectorY.size() && vectorY.size() == vectorZ.size() && vectorZ.size() != 0)
+        {
+            size = vectorX.size();
+            waypoints.resize(size, 3);
+        
+            for(int k = 0; k < size; k++)
+                waypoints.row(k) << vectorX[k], vectorY[k], vectorZ[k];
+
+            trajGeneration(waypoints);
+        }
+        else
+        {
+            std::cout << "unexpected test input: " 
+            << vectorX.size() << " "<< vectorY.size() << " " << vectorZ.size() << " , exit." << std::endl;
+            exit(0);
+        }
     }
 
     ros::Rate rate(100);
@@ -541,6 +578,12 @@ int main(int argc, char** argv)
     {
         ros::spinOnce();  
         status = ros::ok();
+        if(_has_traj)
+        {
+            visWayPointPath(waypoints);
+            visWayPointTraj( _polyCoeff, _polyTime);
+        }
+
         pubCmd();
         rate.sleep();
     }

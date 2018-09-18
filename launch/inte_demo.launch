@@ -4,6 +4,9 @@
 
       <remap from="~waypoints"   to="/waypoint_generator/waypoints"/>
       
+      <param name="demo/use_interactive" value="true" />
+      <param name="demo/pkg_path"        value="$(find time_optimizer)" />
+      
       <param name="planning/start_x"    value="0.0" />
       <param name="planning/start_y"    value="0.0" />
       <param name="planning/start_z"    value="1.0" />
@@ -24,5 +27,7 @@
       <remap from="~goal" to="/goal"/>
       <param name="waypoint_type" value="manual"/>    
   </node>
+
+  <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find time_optimizer)/launch/rviz_config/time_optimizer.rviz" />
 
 </launch>

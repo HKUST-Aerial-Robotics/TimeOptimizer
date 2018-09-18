@@ -1,0 +1,22 @@
+<launch>
+
+  <node pkg="time_optimizer" type="demo" name="demo" output="screen" required = "true">
+      
+      <param name="demo/use_interactive" value="false" />
+      <param name="demo/pkg_path"        value="$(find time_optimizer)" />
+      
+      <param name="planning/d_s"        value="0.05"/>
+      <param name="planning/max_vel"    value="4.0"  />
+      <param name="planning/max_acc"    value="3.0"  />
+      <param name="planning/max_d_acc"  value="3.0"  />
+      <param name="planning/dev_order"  value="4"    />
+      <param name="planning/min_order"  value="3"    />
+
+      <param name="vis/vis_traj_width"  value="0.15" />
+      <param name="vis/is_dump_data"    value="true" />
+
+  </node>
+
+  <node name="visualization" pkg="rviz" type="rviz" output="log" args="-d $(find time_optimizer)/launch/rviz_config/time_optimizer.rviz" />
+
+</launch>
