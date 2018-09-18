@@ -22,6 +22,7 @@ link_directories( ${PROJECT_SOURCE_DIR}/third_party/lib/mosek8_1 )
 link_directories(${PCL_LIBRARY_DIRS})
 
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS} -O3 -Wall")
+set(CMAKE_BUILD_TYPE "Release")
 
 add_executable(demo 
     src/demo.cpp

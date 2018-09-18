@@ -63,7 +63,7 @@ namespace backward {
     void trajGeneration(Eigen::MatrixXd path);
     void rcvWaypointsCallback(const nav_msgs::Path & wp);
 
-ofstream pos_result, vel_result, acc_result;
+ofstream pos_result, vel_result, acc_result, t_result;
 #if 1
 void pubCmd()
 {   
@@ -75,6 +75,9 @@ void pubCmd()
     { 
         //publish position, velocity and acceleration command according to time bias
         double t = max(0.0, (ros::Time::now() - _traj_time_start).toSec() );
+        
+        if(_is_dump_data) t_result<<t<<endl;
+
         MatrixXd time     = _time_allocator->time;
         MatrixXd time_acc = _time_allocator->time_acc;
 
@@ -431,21 +434,31 @@ void trajGeneration(Eigen::MatrixXd path)
     _polyTime  = timeAllocation(path); //_polyTime  = timeAllocationNaive(path); 
 
     // generate a minimum-jerk piecewise monomial polynomial-based trajectory
+    ros::Time time_1 = ros::Time::now();
     _polyCoeff = trajectoryGeneratorWaypoint.PolyQPGeneration(_dev_order, path, vel, acc, _polyTime);   
+    ros::Time time_2 = ros::Time::now();
     _segment_num = _polyCoeff.rows();
-    cout<<"[TimeOptimizer DEMO] spatial trajectory generated"<<endl;
 
+    // visualize the spatial fixed trajectory
+    visWayPointPath(path);
+    visWayPointTraj( _polyCoeff, _polyTime);
+
+    ROS_WARN("[TimeOptimizer DEMO] Spatial trajectory generated");
+    cout<<"[TimeOptimizer DEMO] time cunsume in spatial trajectory is: "<<(time_2 - time_1).toSec()<<endl;
     // use this structure to evaluate this monomial polynomial trajectory in the time optimizer; 
     // or your OWN implementation inheriting the base class for other types of piecewise trajectory (B-spline ...)
     TrajPolyMono polyTraj(_polyCoeff, _polyTime);
     
     _traj_time_final = _traj_time_start = ros::Time::now();
 
+    ros::Time time_3 = ros::Time::now();
     // run the time optimizer
     if(time_optimizer.MinimumTimeGeneration( polyTraj, _MAX_Vel, _MAX_Acc, _MAX_d_Acc, _d_s))
     {   
+        ros::Time time_4 = ros::Time::now();
         _has_traj = true;    
-        cout<<"[TimeOptimizer DEMO] temporal trajectory generated"<<endl;
+        ROS_WARN("[TimeOptimizer DEMO] Temporal trajectory generated");
+        cout<<"[TimeOptimizer DEMO] time cunsume in temporal trajectory is: "<<(time_4 - time_3).toSec()<<endl;
         
         // pull out the results in an allocator data structure
         _time_allocator = time_optimizer.GetTimeAllcoation();
@@ -527,21 +540,25 @@ int main(int argc, char** argv)
     // if want to plot data afterwards, write down all data in local files
     if(_is_dump_data)
     {
-        auto pos_path   = _pkg_path + "/pos.txt";
-        auto vel_path   = _pkg_path + "/vel.txt";
-        auto acc_path   = _pkg_path + "/acc.txt";
+        auto pos_path = _pkg_path + "/pos.txt";
+        auto vel_path = _pkg_path + "/vel.txt";
+        auto acc_path = _pkg_path + "/acc.txt";
+        auto t_path   = _pkg_path + "/time.txt";
         pos_result.open(pos_path);
         vel_result.open(vel_path);
         acc_result.open(acc_path);
+        t_result.open(t_path);
     }
 
     // wait 2 seconds for rviz to be launched.
+    ROS_WARN("[TimeOptimizer DEMO] Wait for RVIZ open");
     sleep(2);
-
+    
     MatrixXd waypoints;
     // if do not use the interactive tool, read waypoints directly from a local file.
     if( !_is_use_inte )
     {
+        ROS_WARN("[TimeOptimizer DEMO] Read data from file");
         std::string file = _pkg_path + "/traj.json";
         std::ifstream f(file);
         json          j;
@@ -578,13 +595,7 @@ int main(int argc, char** argv)
     {
         ros::spinOnce();  
         status = ros::ok();
-        if(_has_traj)
-        {
-            visWayPointPath(waypoints);
-            visWayPointTraj( _polyCoeff, _polyTime);
-        }
-
-        pubCmd();
+        pubCmd();        
         rate.sleep();
     }
 
@@ -593,6 +604,7 @@ int main(int argc, char** argv)
         pos_result.close();
         vel_result.close();
         acc_result.close();
+        t_result.  close();
     }
 
     return 0;
