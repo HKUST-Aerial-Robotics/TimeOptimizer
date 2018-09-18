@@ -74,6 +74,9 @@ We use *3D Nav Goal* to send waypoints for the drone. To use it, click the tool 
 
 **Examples**
 
+<img src="fig/example1.gif" alt="example1" width = "750" height = "450">
+
+<img src="fig/example2.gif" alt="example2" width = "750" height = "450">
 
 ## 6.Visualization the results
 The entire pipeline is : setting waypoints -> generating spatial trajectory -> time optimization -> publishing commands (position, velocity, acceleration). Commands can be viewed in rviz. Then, if you want to plot all commands of the final trajectory, plese run:
