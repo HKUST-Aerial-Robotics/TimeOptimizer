@@ -61,6 +61,8 @@ We provide a clean launch file which has no dependence on other packages, suppos
   roslaunch time_optimizer clean_demo.launch
 ```
 
+<img src="fig/example1.gif" alt="example1" width = "750" height = "450">
+
 **2.**
 If you want to use the interactive tools we provide. Delete the file named 'CATKIN_IGNORE' under the directories of two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**, and run 'catkin_make' to compile them.
 
@@ -71,10 +73,6 @@ Then run following command:
 In rviz, click 'Panels -> tools -> +' and select the plugin 'Goal3DTool'. If you have successfully compiled all packages from [plan_utils](https://github.com/HKUST-Aerial-Robotics/plan_utils), now you can see *3D Nav Goal* in the tools panel.
 
 We use *3D Nav Goal* to send waypoints for the drone. To use it, click the tool (shortcut keyboard 'g' may conflict with *2D Nav Goal*), then press on left mouse button on a position in rviz, click right mouse button to start to drag it slide up or down for a targeting height (don't loose left button at this time). Finally you loose left mouse button and a series of waypoints will be sent to the planner, done.
-
-**Examples**
-
-<img src="fig/example1.gif" alt="example1" width = "750" height = "450">
 
 <img src="fig/example2.gif" alt="example2" width = "750" height = "450">
 
