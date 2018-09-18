@@ -449,7 +449,6 @@ void trajGeneration(Eigen::MatrixXd path)
     // or your OWN implementation inheriting the base class for other types of piecewise trajectory (B-spline ...)
     TrajPolyMono polyTraj(_polyCoeff, _polyTime);
     
-    _traj_time_final = _traj_time_start = ros::Time::now();
 
     ros::Time time_3 = ros::Time::now();
     // run the time optimizer
@@ -463,6 +462,7 @@ void trajGeneration(Eigen::MatrixXd path)
         // pull out the results in an allocator data structure
         _time_allocator = time_optimizer.GetTimeAllcoation();
 
+        _traj_time_final = _traj_time_start = ros::Time::now();
         for(int i = 0; i < _time_allocator->time.rows(); i++)
         {   
             int K = _time_allocator->K(i);
