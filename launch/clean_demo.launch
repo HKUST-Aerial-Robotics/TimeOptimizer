@@ -5,7 +5,7 @@
       <param name="demo/use_interactive" value="false" />
       <param name="demo/pkg_path"        value="$(find time_optimizer)" />
       
-      <param name="planning/d_s"        value="0.05"/>
+      <param name="planning/d_s"        value="0.1"/>
       <param name="planning/max_vel"    value="4.0"  />
       <param name="planning/max_acc"    value="3.0"  />
       <param name="planning/max_d_acc"  value="3.0"  />
