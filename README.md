@@ -17,7 +17,7 @@ This is research code, any fitness for a particular purpose is disclaimed.
 Video of this paper can be found:
 
 <a href="https://www.youtube.com/watch?v=YJdwyJ5h8Ac" target="_blank"><img src="https://img.youtube.com/vi/YJdwyJ5h8Ac/0.jpg" 
-alt="video" width="810" height="540" border="10" /></a>
+alt="video" width="810/2" height="540/2" border="10" /></a>
 
 
 If you use this planning framework for your academic research, please cite our related paper.
