@@ -59,15 +59,10 @@ We provide a clean launch file which has no dependence on other packages, suppos
   roslaunch time_optimizer clean_demo.launch
 ```
 
-<img src="fig/example1.gif" alt="example1" width = "750" height = "450">
+<img src="time_optimizer/fig/example1.gif" alt="example1" width = "750" height = "450">
 
 **2.**
-If you want to use the interactive tools we provide, you have to compile two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**, uncomment two lines in **CMakeList**:
-```
-#add_subdirectory(${PROJECT_SOURCE_DIR}/utils/waypoint_generator)
-#add_subdirectory(${PROJECT_SOURCE_DIR}/utils/rviz_plugins)
-```
-and run 'catkin_make' to compile these two packages.
+If you want to use the interactive tools we provide, you have to compile two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**. By default these two packages will be compiled, if you want to skip them, please add a file named 'CATKIN_IGNORE' under each package's root directory.
 
 Then run the following command:
 ```
@@ -77,7 +72,7 @@ In rviz, click 'Panels -> tools -> +' and select the plugin 'Goal3DTool'. If you
 
 We use *3D Nav Goal* to send waypoints for the drone. To use it, click the tool (shortcut keyboard 'g' may conflict with *2D Nav Goal*), then press on left mouse button on a position in rviz, click right mouse button to start to drag it slide up or down for a targeting height (don't lose left button at this time). Finally, you lose left mouse button, and a series of waypoints will be sent to the planner, done.
 
-<img src="fig/example2.gif" alt="example2" width = "750" height = "450">
+<img src="time_optimizer/fig/example2.gif" alt="example2" width = "750" height = "450">
 
 ## 6.Visualization of Results
 The entire pipeline is : setting waypoints -> generating spatial trajectory -> time optimization -> publishing commands (position, velocity, acceleration). Commands can be viewed in rviz. Then, if you want to plot all commands of the final trajectory, please run:
