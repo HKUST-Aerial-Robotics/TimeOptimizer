@@ -62,7 +62,12 @@ We provide a clean launch file which has no dependence on other packages, suppos
 <img src="fig/example1.gif" alt="example1" width = "750" height = "450">
 
 **2.**
-If you want to use the interactive tools we provide. Delete the file named 'CATKIN_IGNORE' under the directories of two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**, and run 'catkin_make' to compile them.
+If you want to use the interactive tools we provide, you have to compile two additional ros-packages **rviz_plugins** and **waypoint_generator** in **utils**, uncomment two lines in **CMakeList**:
+```
+#add_subdirectory(${PROJECT_SOURCE_DIR}/utils/waypoint_generator)
+#add_subdirectory(${PROJECT_SOURCE_DIR}/utils/rviz_plugins)
+```
+and run 'catkin_make' to compile these two packages.
 
 Then run the following command:
 ```
