@@ -1,40 +1,14 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rviz_plugins)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   rviz
-  multi_map_server
   roscpp
 )
 
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if you package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES irobot_msgs
-  CATKIN_DEPENDS multi_map_server
-#  DEPENDS system_lib
+  CATKIN_DEPENDS #multi_map_server
 )
-
-###########
-## Build ##
-###########
-
-#find_package(Armadillo REQUIRED)
-#include_directories(${ARMADILLO_INCLUDE_DIRS})
-
-## This plugin includes Qt widgets, so we must include Qt like so:
-#find_package(Qt5 COMPONENTS QtCore QtGui REQUIRED)
 
 if(rviz_QT_VERSION VERSION_LESS "5")
   message(STATUS "Using Qt4 based on the rviz_QT_VERSION: ${rviz_QT_VERSION}")
@@ -48,33 +22,18 @@ else()
   set(QT_LIBRARIES Qt5::Widgets)
 endif()
 
-## I prefer the Qt signals and slots to avoid defining "emit", "slots",
-## etc because they can conflict with boost signals, so define QT_NO_KEYWORDS here.
 add_definitions(-DQT_NO_KEYWORDS)
 
-## Here we specify which header files need to be run through "moc",
-## Qt's meta-object compiler.
 qt5_wrap_cpp(MOC_FILES
   src/goal_tool.h
-  src/probmap_display.h
-  src/aerialmap_display.h    
-  src/multi_probmap_display.h      
 )
 
-## Here we specify the list of source files, including the output of
-## the previous command which is stored in ``${MOC_FILES}``.
 set(SOURCE_FILES
   src/pose_tool.cpp
   src/goal_tool.cpp
-  src/probmap_display.cpp
-  src/aerialmap_display.cpp   
-  src/multi_probmap_display.cpp  
   ${MOC_FILES}
 )
 
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
 include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
