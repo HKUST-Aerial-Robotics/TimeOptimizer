@@ -35,7 +35,7 @@ If you use this planning framework for your academic research, please cite our r
 
 ## 2.Prerequisities
 - Our testing environment: **Ubuntu** 16.04, **ROS** Kinetic.
-- If you want to use the interactive tool to set waypoints for the trajectory, please follow **5.1** to compile the tools in folder 'utils'. Otherwise, clone this package and compile and run. Remember to approve a license from **mosek** following **4**.
+- If you want to use the interactive tool to set waypoints for the trajectory, please follow **5.1**. Remember to approve a license from **mosek** following **4**.
 
 ## 3.Build on ROS
   Clone the repository to your catkin workspace and catkin_make. For example:
