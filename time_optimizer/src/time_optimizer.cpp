@@ -20,8 +20,12 @@ int MinimumTimeOptimizer::MinimumTimeGeneration(
     const double & maxVel, 
     const double & maxAcc, 
     const double & maxdAcc, 
-    const double & d_s)
+    const double & d_s,
+    const double & rho)
 {
+
+#define min_T 40
+
     /* minimum time physical feasible trajectory time allocator. */
     /* objective is to generate motion as fast as possible within the physical limitaion (vel, acc and jerk). */
     _P          = traj.getP();
@@ -52,6 +56,8 @@ int MinimumTimeOptimizer::MinimumTimeGeneration(
     int _inequ_vel_num = 0;   // linear bounding constraints for velocity in x, y, z axis
     int _inequ_acc_num = 0;   // linear bounding constraints for acceleration
     int _inequ_jer_num = 0;   // linear bounding constraints for jerk
+
+    int _inequ_tot_T_num = 1;
 
     vector<VectorXd> s_list;
     VectorXd k_list(_seg_num);
@@ -225,6 +231,9 @@ int MinimumTimeOptimizer::MinimumTimeGeneration(
         pair<MSKboundkeye, pair<double, double> > cb_ie = make_pair( MSK_BK_RA, make_pair( - maxJer_s, + maxJer_s ) ); 
         con_bdk.push_back(cb_ie);   
     }
+
+    pair<MSKboundkeye, pair<double, double> > cb_ie = make_pair( MSK_BK_LO, make_pair( min_T, + MSK_INFINITY ) ); 
+    con_bdk.push_back(cb_ie);   
 
     MSKint32t  j,i; 
     MSKenv_t   env; 
@@ -576,6 +585,31 @@ int MinimumTimeOptimizer::MinimumTimeGeneration(
     }
 #endif   
 
+    // For the minimum total time constraint
+/*    int nzi = num_d_n + 1;
+    MSKint32t asub[nzi];
+    double aval[nzi];
+
+    aval[0] = d_s;
+    asub[0] = num_x_n;
+
+    int idx = 1;
+    
+    idx_bias = 0;
+    for(int k = 0; k < _seg_num; k++)
+    {   
+        int K = k_list[k];
+        for(int i = 0; i < K; i++)
+        {
+            aval[idx] = 2.0 * d_s;
+            asub[idx] = idx_bias + num_a[k] + num_b[k] + num_c[k] + i;
+            idx ++;
+        }
+        idx_bias += num_x[k];
+    }
+    
+    r = MSK_putclist(task, nzi, asub, aval);*/
+
     //Stacking all conic cones;
     idx_bias = 0;
     {   
@@ -645,7 +679,7 @@ int MinimumTimeOptimizer::MinimumTimeGeneration(
     MSKint32t asub[nzi];
     double aval[nzi];
 
-    aval[0] = d_s;
+    aval[0] = rho * d_s;
     asub[0] = num_x_n;
 
     int idx = 1;

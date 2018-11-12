@@ -12,6 +12,7 @@
       <param name="planning/start_z"    value="1.0" />
 
       <param name="planning/d_s"        value="0.05"/>
+      <param name="planning/rho"        value="0.0" />
       <param name="planning/max_vel"    value="4.0"  />
       <param name="planning/max_acc"    value="3.0"  />
       <param name="planning/max_d_acc"  value="3.0"  />

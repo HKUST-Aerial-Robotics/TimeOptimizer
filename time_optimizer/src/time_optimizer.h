@@ -24,7 +24,8 @@ public:
                                     const double & maxVel, 
                                     const double & maxAcc,
                                     const double & maxdAcc,
-                                    const double & d_s); 
+                                    const double & d_s,
+                                    const double & rho); 
 
         Allocator * GetTimeAllcoation() {return time_allocator;}
 };
