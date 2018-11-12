@@ -77,7 +77,6 @@ void pubCmd()
         //publish position, velocity and acceleration command according to time bias
         double t = max(0.0, (ros::Time::now() - _traj_time_start).toSec() );
         
-        cout<<"time: "<<t<<endl;
         if(_is_dump_data) t_result<<t<<endl;
 
         MatrixXd time     = _time_allocator->time;
@@ -116,11 +115,9 @@ void pubCmd()
         double delta_s = t * _time_allocator->s_step / delta_t;
         double s = _time_allocator->s(idx, grid_idx) + delta_s;
 
-        cout<<"t: "<<t<<", s: "<<s<<", idx: "<<idx<<endl;
         // get position data 
         Vector3d position_s = getPosPoly(_polyCoeff, idx, s); 
         Vector3d position   = position_s;
-        cout<<"position: "<<position(0)<<", "<<position(1)<<", "<<position(2)<<endl;
 
         // get velocity data
         double s_k   = _time_allocator->s(idx, grid_idx);
@@ -438,8 +435,6 @@ void trajGeneration(Eigen::MatrixXd path)
 
     // give an arbitraty time allocation, all set all durations as 1 in the commented function.
     _polyTime  = timeAllocation(path); //_polyTime  = timeAllocationNaive(path); 
-
-    cout<<"_polyTime: \n"<<_polyTime<<endl;
 
     // generate a minimum-jerk piecewise monomial polynomial-based trajectory
     ros::Time time_1 = ros::Time::now();
