@@ -35,7 +35,8 @@ If you use this planning framework for your academic research, please cite our r
 
 ## 2.Prerequisities
 - Our testing environment: **Ubuntu** 16.04, **ROS** Kinetic.
-- If you want to use the interactive tool to set waypoints for the trajectory, please follow **5.1** to compile the tools in folder 'utils'. Otherwise, clone this package and compile and run. Remember to approve a license from **mosek** following **4**.
+- If you want to directly set waypoints in **Rviz** for generating the spatial trajectory, please follow **5.2**. Otherwise you should follow **5.1**. 
+- Remember to approve a license from **mosek** following **4**.
 
 ## 3.Build on ROS
   Clone the repository to your catkin workspace and catkin_make. For example:
@@ -51,7 +52,7 @@ If you use this planning framework for your academic research, please cite our r
 We use **mosek** for solving second-order cone program(SOCP). To use mosek, you should approve an academic license in [here](https://www.mosek.com/products/academic-licenses/). The academic license is free and is easy to approve. Then create a folder named 'mosek' in your home directory and put your license in it. All header and library files are already included in the 'third_party' folder under this repo, so you don't need to download mosek again. 
 
 ## 5.Usage
-If you have done all above, you can try the simple demo in two ways.
+The time optimizer can be applied to an arbitrary type pieciwise polynomial-based trajectory, and we proovide a simple demo using minimum-jerk monomial polynomials as an example. If you have done all above configuration, you can try the simple demo in two ways
 
 **1.**
 We provide a clean launch file which has no dependence on other packages, suppose you do not want to configure the interactive tools we provide. In this way, you can write down you the coordinates of all waypoints in the **traj.json** file under the root directory of this package, and the program would read it after launching:
@@ -82,11 +83,14 @@ The entire pipeline is : setting waypoints -> generating spatial trajectory -> t
   python draw.py
 ```
 
-## 7.Acknowledgements
+## 8.Extension
+To use the time optimizer with other kinds of spatial trajectory generator, you can follow 'demo.cpp' as an example. The simplest way is to implemente your own trajectory type as an inheritance of the class 'Trajectory' definded in 'trajectory_base.h'.
+
+## 9.Acknowledgements
   We use [mosek](https://www.mosek.com/) for solving second-order cone program(SOCP).
 
-## 8.Licence
+## 10.Licence
 The source code is released under [GPLv3](http://www.gnu.org/licenses/) license.
 
-## 9.Notes
+## 11.Notes
 - The code has not been deeply tested, if you find any problems, do not hesitate to raise an issue or write an e-mail to me.
